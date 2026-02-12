@@ -28,6 +28,8 @@ jobs:
           npm ci
           
       - name: Build
+        env:
+          VITE_BASE: /honeypot/
         run: |
           cd web-app
           npm run build
