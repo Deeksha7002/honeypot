@@ -103,9 +103,9 @@ export const GlobalThreatMap: React.FC<GlobalThreatMapProps> = ({ onRegionSelect
             >
                 <MapController locations={activeLocations} />
 
-                {/* Dark Matter Tiles for Cyber Look */}
+                {/* Dark Matter Tiles for Cyber Look (No Labels to avoid misspelled base texture) */}
                 <TileLayer
-                    url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                    url="https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png"
                 />
 
                 {/* Render Region Markers (Pulsing Orbs) */}
@@ -216,10 +216,12 @@ export const GlobalThreatMap: React.FC<GlobalThreatMapProps> = ({ onRegionSelect
                     left: 50%;
                     transform: translateX(-50%);
                     margin-top: 5px;
-                    font-size: 10px;
-                    font-weight: 600;
+                    font-size: 11px;
+                    font-weight: 700;
+                    letter-spacing: 0.05em;
+                    text-transform: uppercase;
                     white-space: nowrap;
-                    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+                    text-shadow: 0 0 4px rgba(0,0,0,1), 0 2px 4px rgba(0,0,0,0.8);
                     pointer-events: none;
                 }
 

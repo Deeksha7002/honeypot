@@ -14,7 +14,6 @@ export const SystemDashboard: React.FC<SystemDashboardProps> = ({ activeThreats 
     const [networkTraffic, setNetworkTraffic] = useState(45);
     const [enhancedMonitoring, setEnhancedMonitoring] = useState<{ region: string, active: boolean }>({ region: '', active: false });
 
-    // Simulate live system vitals
     useEffect(() => {
         const interval = setInterval(() => {
             if (activeThreats > 20) {

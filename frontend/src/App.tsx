@@ -7,9 +7,11 @@ import { SystemDashboard } from './components/SystemDashboard';
 import { LiveIntercept } from './components/LiveIntercept';
 import { MockScammerAPI } from './lib/MockScammerAPI';
 import { HoneypotAgent } from './lib/HoneypotAgent';
+import { IntelligenceService } from './lib/IntelligenceService';
+import { IntelligenceReport } from './components/IntelligenceReport';
 import { soundManager } from './lib/SoundManager';
 import { GeoTracer } from './lib/GeoTracer';
-import { Play, Database, Volume2, VolumeX, ShieldAlert, LogOut, CheckCircle } from 'lucide-react';
+import { Play, Database, Volume2, VolumeX, ShieldAlert, LogOut, CheckCircle, BarChart3 } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
 import { useThreads } from './context/ThreadProvider';
 import type { Message, Thread, CaseFile, Scenario } from './lib/types';
@@ -24,6 +26,7 @@ function App() {
 
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [isMonitoring, setIsMonitoring] = useState(false);
+  const [showIntelligence, setShowIntelligence] = useState(false);
   const [showLocker, setShowLocker] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
@@ -175,7 +178,17 @@ function App() {
       const relationalContext = scenario?.relationalContext;
 
       // Classify the incoming message
-      const { classification, safeText, intent, score, isCompromised, autoReported } = agent.ingest(content, threadId, relationalContext);
+      const { classification, safeText, intent, score, isCompromised, autoReported, missionComplete, scamType, iocs } = agent.ingest(content, threadId, relationalContext);
+
+      // Record in Intelligence Service if it's a scam
+      if (classification === 'scam' || classification === 'likely_scam') {
+        IntelligenceService.recordScam({
+          type: scamType,
+          senderName: senderName || 'Unknown Threat',
+          conversationId: threadId,
+          identifiers: iocs
+        });
+      }
 
 
 
@@ -190,9 +203,9 @@ function App() {
       console.log(`[Thread ${threadId}] Processing message. ScenarioId: ${scenarioId}, Class: ${classification}, WasIntercepted: ${wasIntercepted}`);
 
       // Logic refined: Only reply if it's explicitly a scam (new or existing).
-      // We removed "!!scenarioId" to ensure we don't reply to benign "Mom" threads.
-      const shouldReply = isNewInterception || wasIntercepted;
-      console.log(`[Thread ${threadId}] Should Reply? ${shouldReply}`);
+      // AND Only if the mission is not yet complete (Capture & Kill Policy)
+      const shouldReply = (isNewInterception || wasIntercepted) && !missionComplete && !threadState?.isBlocked;
+      console.log(`[Thread ${threadId}] Should Reply? ${shouldReply} (MissionComplete: ${missionComplete}, Blocked: ${threadState?.isBlocked})`);
 
       setThreads((prev: Thread[]) => prev.map((t: Thread) => {
         if (t.id !== threadId) return t;
@@ -205,8 +218,9 @@ function App() {
         return {
           ...t,
           classification,
-          isIntercepted: shouldReply, // Persist interception status
+          isIntercepted: shouldReply || (missionComplete && t.isIntercepted), // Maintain intercepted status even if blocked
           isScanning: false,
+          isBlocked: missionComplete || t.isBlocked,
           persona: agent!.currentPersona, // Use non-null assertion or optional chaining
           intent,
           threatScore: score,
@@ -220,6 +234,18 @@ function App() {
           })
         };
       }));
+
+      // If mission is complete, add a system notification message and block further interaction
+      if (missionComplete && !threadState?.isBlocked) {
+        addMessageToThread(threadId, {
+          id: `block-${Date.now()}`,
+          sender: 'system',
+          content: "🛡️ INTELLIGENCE CAPTURED: All necessary credentials obtained. Connection terminated. Scammer has been blocked from further contact.",
+          timestamp: Date.now()
+        });
+        soundManager.playSuccess();
+        setNotification(`Mission Complete: Scammer blocked for ${senderName || 'Unknown'}`);
+      }
 
       // Trigger Notification for Auto-Reporting
       if (autoReported && !threadState?.autoReported) {
@@ -393,7 +419,8 @@ function App() {
               isIntercepted: t.isIntercepted,
               persona: t.persona,
               autoReported: t.autoReported,
-              isCompromised: t.isCompromised
+              isCompromised: t.isCompromised,
+              isBlocked: t.isBlocked
             }))}
 
             selectedThreadId={selectedThreadId}
@@ -416,8 +443,11 @@ function App() {
             ) : (
               <>
 
-                <button onClick={() => setShowLocker(true)} className="btn btn-locker">
-                  <Database size={16} /> <span className="btn-text">EVIDENCE LOCKER</span>
+                <button onClick={() => { setShowLocker(!showLocker); setShowIntelligence(false); }} className={`nav-btn ${showLocker ? 'active' : ''}`}>
+                  <Database size={18} /> Intelligence Locker
+                </button>
+                <button onClick={() => { setShowIntelligence(!showIntelligence); setShowLocker(false); }} className={`nav-btn ${showIntelligence ? 'active' : ''}`} style={{ borderColor: 'var(--status-info)', color: 'var(--status-info)' }}>
+                  <BarChart3 size={18} /> Monitor Intelligence
                 </button>
               </>
             )}
@@ -576,12 +606,26 @@ function App() {
         </div>
       </div >
 
-      {/* Evidence Locker Overlay - Moved Outside */}
       {
         showLocker && (
           <Suspense fallback={<div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.8)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading Secure Module...</div>}>
             <EvidenceLocker cases={getCaseFiles()} onClose={() => setShowLocker(false)} />
           </Suspense>
+        )
+      }
+      {
+        showIntelligence && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(15, 23, 42, 0.95)', overflowY: 'auto' }}>
+            <div style={{ maxWidth: '1000px', margin: '2rem auto', background: '#1e293b', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
+              <button
+                onClick={() => setShowIntelligence(false)}
+                style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.5rem' }}
+              >
+                ×
+              </button>
+              <IntelligenceReport />
+            </div>
+          </div>
         )
       }
     </>

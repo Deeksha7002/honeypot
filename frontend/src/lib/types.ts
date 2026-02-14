@@ -65,6 +65,7 @@ export interface Thread {
     classification: Classification | null;
     isIntercepted: boolean;
     isArchived: boolean;
+    isBlocked?: boolean;
     autoReported?: boolean;
     isScanning: boolean;
     persona?: string;
@@ -89,3 +90,22 @@ export interface CaseFile {
     autoReported?: boolean; // Added this field
 }
 
+export type ScamType = 'ROMANCE' | 'CRYPTO' | 'JOB' | 'IMPERSONATION' | 'LOTTERY' | 'TECHNICAL_SUPPORT' | 'AUTHORITY' | 'OTHER';
+
+export interface ScamRecord {
+    id: string;
+    timestamp: number;
+    type: ScamType;
+    senderName: string;
+    conversationId: string;
+    identifiers: string[]; // Wallets, URLs, IPs captured
+}
+
+export interface IntelligenceSummary {
+    today: number;
+    week: number;
+    month: number;
+    byType: Record<ScamType, number>;
+    uniqueScammers: number;
+    repeatedIdentifiers: string[];
+}

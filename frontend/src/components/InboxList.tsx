@@ -12,6 +12,7 @@ interface ThreadSummary {
     persona?: string;
     isCompromised?: boolean;
     autoReported?: boolean;
+    isBlocked?: boolean;
 }
 
 interface InboxListProps {
@@ -123,6 +124,25 @@ export const InboxList: React.FC<InboxListProps> = ({ threads, selectedThreadId,
                                     fontWeight: 'bold'
                                 }}>
                                     REPORTED
+                                </div>
+                            )}
+
+                            {t.isBlocked && (
+                                <div style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    background: 'rgba(239, 68, 68, 0.15)',
+                                    color: '#f87171',
+                                    fontSize: '0.65rem',
+                                    padding: '1px 6px',
+                                    borderRadius: '4px',
+                                    marginTop: '4px',
+                                    marginLeft: '4px',
+                                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                                    fontWeight: 'bold'
+                                }}>
+                                    BLOCKED
                                 </div>
                             )}
                         </div>

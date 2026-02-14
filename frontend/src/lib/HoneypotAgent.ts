@@ -4,7 +4,7 @@ import { SafetyGuard } from './Safety';
 import { BaitGenerator } from './BaitGenerator';
 import { ScamAnalyzer } from './ScamAnalyzer';
 import { CyberCellService } from './CyberCellService';
-import type { Classification, Message, IncidentReport, IOCs } from './types';
+import type { Classification, Message, IncidentReport, IOCs, ScamType } from './types';
 
 export class HoneypotAgent {
     private iocs: IOCs = {
@@ -16,6 +16,7 @@ export class HoneypotAgent {
 
     // Track the highest threat level observed in the current conversation
     private maxThreatLevel: Classification = 'benign';
+    private currentScamType: ScamType = 'OTHER';
     private analyzer = new ScamAnalyzer();
     private conversationHistory: Message[] = [];
 
@@ -25,7 +26,25 @@ export class HoneypotAgent {
     // Track if already reported to avoid duplicates
     private hasAutoReported: boolean = false;
 
-    ingest(text: string, conversationId: string, relationalContext?: 'family' | 'work' | 'friend'): { classification: Classification, safeText: string, intent: string, score: number, isCompromised: boolean, autoReported: boolean } {
+    public isIntelligenceSufficient(): boolean {
+        const iocCount = this.iocs.urls.length + this.iocs.paymentMethods.length + this.iocs.domains.length;
+        // Sufficient if we have at least one malicious URL OR one payment method
+        return iocCount > 0 && (this.iocs.urls.length > 0 || this.iocs.paymentMethods.length > 0);
+    }
+
+    private detectScamType(text: string): ScamType {
+        const lower = text.toLowerCase();
+        if (lower.match(/(crypto|bitcoin|eth|wallet|binance|coinbase|investment|yield|profit)/)) return 'CRYPTO';
+        if (lower.match(/(job|work from home|salary|recruit|hiring|task|telegram task)/)) return 'JOB';
+        if (lower.match(/(love|dear|sweet|honey|romantic|meeting|lonely)/)) return 'ROMANCE';
+        if (lower.match(/(irs|police|warrant|arrest|jail|federal|tax|violation)/)) return 'AUTHORITY';
+        if (lower.match(/(support|hacked|virus|microsoft|anydesk|teamviewer)/)) return 'TECHNICAL_SUPPORT';
+        if (lower.match(/(prize|winner|lottery|won|jackpot|congratulations)/)) return 'LOTTERY';
+        if (lower.match(/(impersonat|mom|dad|son|daughter|family|friend|urgent favor)/)) return 'IMPERSONATION';
+        return 'OTHER';
+    }
+
+    ingest(text: string, conversationId: string, relationalContext?: 'family' | 'work' | 'friend'): { classification: Classification, safeText: string, intent: string, score: number, isCompromised: boolean, autoReported: boolean, missionComplete: boolean, scamType: ScamType, iocs: string[] } {
         // 1. Redact
         const safeText = SafetyGuard.redactPII(text);
         if (safeText !== text) {
@@ -88,13 +107,20 @@ export class HoneypotAgent {
 
         console.log(`[HoneypotAgent] Ingest Complete. Class: ${this.maxThreatLevel}, Reported: ${autoReported}, Intent: ${intent}`);
 
+        if (currentClassification === 'scam' || currentClassification === 'likely_scam') {
+            this.currentScamType = this.detectScamType(text);
+        }
+
         return {
             classification: this.maxThreatLevel,
             safeText,
             intent,
             score: Math.round(score * 100), // 0-100 scale
             isCompromised,
-            autoReported
+            autoReported,
+            missionComplete: this.isIntelligenceSufficient(),
+            scamType: this.currentScamType,
+            iocs: [...this.iocs.urls, ...this.iocs.paymentMethods]
         };
     }
 
