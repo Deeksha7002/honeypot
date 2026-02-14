@@ -411,15 +411,179 @@ body {
   color: var(--status-success);
 }
 
-/* Cards (Dashboard) */
+/* Cards (Dashboard) - Premium Overhaul with 3D Effects */
+.vitals-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  perspective: 1200px;
+  /* Fundamental for 3D */
+}
+
 .sys-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-color);
+  background: rgba(18, 27, 46, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-lg);
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.25rem;
+  position: relative;
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+  transition: transform 0.1s ease-out, box-shadow 0.1s ease-out, background 0.3s ease;
+  transform-style: preserve-3d;
+  /* Allows children to use 3D space */
+  will-change: transform;
+}
+
+.sys-card:hover {
+  background: rgba(30, 42, 69, 0.5);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Inner 3D Content Layers - Enhanced Realism */
+.sys-card-header,
+.sys-card-value,
+.sys-progress-bg,
+.sys-card-sub {
+  transform: translateZ(30px);
+  transform-style: preserve-3d;
+  filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.4));
+  /* Internal shadows for depth */
+}
+
+.sys-card-header span:first-child {
+  transform: translateZ(50px);
+  filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.3));
+}
+
+.sys-card-value {
+  transform: translateZ(70px);
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.1),
+    0 15px 15px rgba(0, 0, 0, 0.5);
+  /* Cast shadow onto glass */
+}
+
+/* High-tech Lighting Overlay */
+.sys-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+      rgba(255, 255, 255, 0.12) 0%,
+      transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.sys-card:hover::before {
+  opacity: 1;
+}
+
+/* Holographic Overlay */
+.hologram-overlay {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(0deg,
+      rgba(255, 255, 255, 0.03) 0px,
+      rgba(255, 255, 255, 0.03) 1px,
+      transparent 1px,
+      transparent 2px);
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0.5;
+  animation: scanline 10s linear infinite;
+}
+
+@keyframes scanline {
+  from {
+    background-position: 0 0;
+  }
+
+  to {
+    background-position: 0 100%;
+  }
+}
+
+/* Dynamic Glare / Reflection System */
+.glare-surface {
+  position: absolute;
+  inset: -50%;
+  background: linear-gradient(135deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.05) 45%,
+      rgba(255, 255, 255, 0.15) 50%,
+      rgba(255, 255, 255, 0.05) 55%,
+      transparent 100%);
+  transform: translate(calc(var(--mouse-x, 50%) * 0.2% - 10%), calc(var(--mouse-y, 50%) * 0.2% - 10%));
+  pointer-events: none;
+  z-index: 15;
+  mix-blend-mode: overlay;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.sys-card:hover .glare-surface {
+  opacity: 1;
+}
+
+/* Material Texture */
+.material-grain {
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.03;
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Idle Bobbing Animation */
+@keyframes float-idle {
+
+  0%,
+  100% {
+    transform: translateY(0) rotateX(var(--idle-x, 0deg)) rotateY(var(--idle-y, 0deg));
+  }
+
+  50% {
+    transform: translateY(-5px) rotateX(calc(var(--idle-x, 0deg) + 2deg));
+  }
+}
+
+.sys-card-idle {
+  animation: float-idle 6s ease-in-out infinite;
+}
+
+/* Cyber Corner Accents */
+.sys-card::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--primary);
+  opacity: 0.3;
+  pointer-events: none;
+  bottom: 12px;
+  right: 12px;
+  border-left: none;
+  border-top: none;
+  z-index: 5;
+}
+
+/* Specific accent for top-left (merged into pseudo-element logic elsewhere or kept simple) */
+.sys-card-accent-tl {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 10px;
+  height: 10px;
+  border-top: 1px solid var(--primary);
+  border-left: 1px solid var(--primary);
+  opacity: 0.3;
 }
 
 .sys-card-header {
@@ -427,34 +591,73 @@ body {
   align-items: center;
   gap: 0.75rem;
   color: var(--text-secondary);
-  font-size: 0.85rem;
-  font-weight: 500;
+  font-size: 0.75rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.1em;
 }
 
 .sys-card-value {
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: 2.25rem;
+  font-weight: 800;
   color: var(--text-primary);
+  font-family: var(--font-mono);
+  line-height: 1;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
 }
 
 .sys-progress-bg {
-  height: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 1.5px;
   overflow: hidden;
+  position: relative;
 }
 
 .sys-progress-bar {
   height: 100%;
-  border-radius: 2px;
-  transition: width 0.5s ease;
+  border-radius: 1.5px;
+  transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 0 10px currentColor;
 }
 
 .sys-card-sub {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sys-card-metric {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+}
+
+/* Neural pulse animation */
+@keyframes neural-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+}
+
+.neural-active {
+  animation: neural-pulse 2s infinite ease-in-out;
 }
 
 /* Chat View */
