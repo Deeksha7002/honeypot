@@ -16,10 +16,18 @@ const updateSW = registerSW({
   },
 })
 
+import { AuthProvider } from './context/AuthContext.tsx'
+import { ThreadProvider } from './context/ThreadProvider.tsx'
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      <App />
+      <AuthProvider>
+        <ThreadProvider>
+          <App />
+        </ThreadProvider>
+      </AuthProvider>
     </ErrorBoundary>
   </StrictMode>,
 )
+

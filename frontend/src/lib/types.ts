@@ -55,6 +55,26 @@ export interface IncidentReport {
     detectedLocation?: GeoLocation; // New field
 }
 
+export interface Thread {
+    id: string;
+    scenarioId: string;
+    senderName: string;
+    source: 'sms' | 'email' | 'chat';
+    messages: Message[];
+    classification: Classification | null;
+    isIntercepted: boolean;
+    isArchived: boolean;
+    autoReported?: boolean;
+    isScanning: boolean;
+    persona?: string;
+    avatar?: string;
+    location?: string;
+    detectedLocation?: GeoLocation;
+    intent?: string;
+    threatScore?: number;
+    isCompromised?: boolean;
+}
+
 export interface CaseFile {
     id: string;
     scammerName: string;
@@ -64,5 +84,7 @@ export interface CaseFile {
     iocs: IOCs;
     transcript: Message[];
     timestamp: string;
-    detectedLocation?: GeoLocation; // New field
+    detectedLocation?: GeoLocation;
+    autoReported?: boolean; // Added this field
 }
+

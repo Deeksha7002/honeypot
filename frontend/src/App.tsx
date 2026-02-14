@@ -2,60 +2,31 @@ import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { ChatWindow } from './components/ChatWindow';
 import { InboxList } from './components/InboxList';
 import { LoginScreen } from './components/LoginScreen';
-// EvidenceLocker is lazy loaded below
 import { LockScreen } from './components/LockScreen';
 import { SystemDashboard } from './components/SystemDashboard';
 import { LiveIntercept } from './components/LiveIntercept';
 import { MockScammerAPI } from './lib/MockScammerAPI';
 import { HoneypotAgent } from './lib/HoneypotAgent';
 import { soundManager } from './lib/SoundManager';
-import type { Message, Classification, GeoLocation } from './lib/types';
 import { GeoTracer } from './lib/GeoTracer';
-import { Play, Database, Volume2, VolumeX, ShieldAlert } from 'lucide-react';
+import { Play, Database, Volume2, VolumeX, ShieldAlert, LogOut } from 'lucide-react';
+import { useAuth } from './context/AuthContext';
+import { useThreads } from './context/ThreadProvider';
+import type { Message, Classification, GeoLocation, Thread, CaseFile, Scenario } from './lib/types';
 import './index.css';
 
 const EvidenceLocker = lazy(() => import('./components/EvidenceLocker').then(module => ({ default: module.EvidenceLocker })));
 
-// Thread model for state
-interface Thread {
-  id: string;
-  scenarioId: string;
-  senderName: string;
-  source: 'sms' | 'email' | 'chat';
-  messages: Message[];
-  classification: Classification | null;
-  isIntercepted: boolean;
-  isArchived: boolean;
-  autoReported?: boolean;
-  isScanning: boolean;
-  persona?: string;
-  avatar?: string; // URL to avatar image
-  location?: string; // General region string (e.g. "West Africa")
-  detectedLocation?: GeoLocation; // Precise traced data
-  intent?: string; // New: AI Detected Intent
-  threatScore?: number; // New: 0-100
-  isCompromised?: boolean; // New: Flag for compromised known contacts
-}
 
 function App() {
-  const [threads, setThreads] = useState<Thread[]>([]);
+  const { threads, setThreads, clearThreads } = useThreads();
+  const { isAuthenticated, logout } = useAuth();
+
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [showLocker, setShowLocker] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
 
-  // Auth State
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return sessionStorage.getItem('auth_token') === 'scam-defender-verified';
-  });
-
-  const handleLogin = (username: string) => {
-    console.log(`User ${username} logged in`);
-    sessionStorage.setItem('auth_token', 'scam-defender-verified');
-    // Clear legacy local storage to ensure behavior consistency
-    localStorage.removeItem('auth_token');
-    setIsAuthenticated(true);
-  };
 
 
 
@@ -105,7 +76,8 @@ function App() {
     soundManager.playAlert(); // Major alert
   };
 
-  const spawnBotnetThread = (scenario: import('./lib/types').Scenario) => {
+  const spawnBotnetThread = (scenario: Scenario) => {
+
     const threadId = scenario.id;
     const agent = new HoneypotAgent();
     agentsRef.current.set(threadId, agent);
@@ -127,7 +99,8 @@ function App() {
       isArchived: false
     };
 
-    setThreads(prev => [newThread, ...prev]); // Add to top
+    setThreads((prev: Thread[]) => [newThread, ...prev]); // Add to top
+
 
     // Inject initial message immediately and trigger AI flow (silent mode)
     const initialMsg = scenario.messages[0];
@@ -158,7 +131,8 @@ function App() {
       isArchived: false
     };
 
-    setThreads(prev => [...prev, newThread]);
+    setThreads((prev: Thread[]) => [...prev, newThread]);
+
     // setSelectedThreadId(prev => prev || threadId); // Don't auto-select so user can see Dashboard
 
     const initialMsg = scenario.messages[0];
@@ -194,6 +168,8 @@ function App() {
       // Classify the incoming message
       const { classification, safeText, intent, score, isCompromised, autoReported } = agent.ingest(content, threadId, relationalContext);
 
+
+
       // Check interception status from current state + new classification
       // Check interception status from current state + new classification
       // CRITICAL FIX: Use threadsRef to get latest state, avoiding stale closures in recursive calls
@@ -209,7 +185,7 @@ function App() {
       const shouldReply = isNewInterception || wasIntercepted;
       console.log(`[Thread ${threadId}] Should Reply? ${shouldReply}`);
 
-      setThreads(prev => prev.map(t => {
+      setThreads((prev: Thread[]) => prev.map((t: Thread) => {
         if (t.id !== threadId) return t;
 
         // Trigger alert sound if this is a new interception (and not silent)
@@ -226,7 +202,8 @@ function App() {
           intent,
           threatScore: score,
           isCompromised: isCompromised || t.isCompromised,
-          messages: t.messages.map((m, idx) => {
+          autoReported: autoReported || t.autoReported, // Capture auto-reporting status
+          messages: t.messages.map((m: Message, idx: number) => {
             if (idx === t.messages.length - 1 && m.sender === 'scammer') {
               return { ...m, content: safeText, isRedacted: safeText !== content };
             }
@@ -234,6 +211,8 @@ function App() {
           })
         };
       }));
+
+
 
       // Generate AI Response if Thread is Active/Intercepted
       if (shouldReply) {
@@ -285,7 +264,7 @@ function App() {
   };
 
   const addMessageToThread = (threadId: string, msg: Message) => {
-    setThreads(prev => prev.map(t => {
+    setThreads((prev: Thread[]) => prev.map((t: Thread) => {
       if (t.id === threadId) {
         return { ...t, messages: [...t.messages, msg] };
       }
@@ -293,10 +272,13 @@ function App() {
     }));
   };
 
-  const getCaseFiles = (): import('./lib/types').CaseFile[] => {
-    const cases: import('./lib/types').CaseFile[] = [];
 
-    threads.forEach(thread => {
+  const getCaseFiles = (): CaseFile[] => {
+    const cases: CaseFile[] = [];
+
+
+    threads.forEach((thread: Thread) => {
+
       // Only create cases for active threats or scanned threads
       if (!thread.classification && !thread.isIntercepted) return;
       if (thread.classification === 'benign') return; // Optional: Hide safe threads
@@ -310,7 +292,8 @@ function App() {
         id: thread.id,
         scammerName: thread.senderName,
         platform: thread.source,
-        status: 'active',
+        status: thread.isArchived ? 'closed' : 'active',
+
         threatLevel: thread.classification || 'likely_scam',
         iocs: report.iocs,
         transcript: thread.messages,
@@ -329,8 +312,9 @@ function App() {
   const [isLocked, setIsLocked] = useState(false);
 
   if (!isAuthenticated) {
-    return <LoginScreen onLogin={handleLogin} />;
+    return <LoginScreen />;
   }
+
 
   if (isLocked) {
     return <LockScreen onUnlock={() => setIsLocked(false)} />;
@@ -342,7 +326,7 @@ function App() {
         {/* Sidebar */}
         <div className="sidebar">
           <InboxList
-            threads={threads.map(t => ({
+            threads={threads.map((t: Thread) => ({
               id: t.id,
               senderName: t.senderName,
               source: t.source,
@@ -351,6 +335,7 @@ function App() {
               isIntercepted: t.isIntercepted,
               persona: t.persona
             }))}
+
             selectedThreadId={selectedThreadId}
             onSelectThread={(id) => {
               if (id === 'DASHBOARD_VIEW') {
@@ -383,8 +368,23 @@ function App() {
               {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
               {isMuted ? 'Unmute Audio' : 'Mute Audio'}
             </button>
+
+            <button
+              onClick={() => {
+                logout();
+                clearThreads();
+                setSelectedThreadId(null);
+                setIsMonitoring(false);
+                isMonitoringRef.current = false;
+              }}
+              className="btn btn-logout"
+              style={{ marginTop: 'auto', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+            >
+              <LogOut size={16} /> <span className="btn-text">TERMINATE SESSION</span>
+            </button>
           </div>
         </div>
+
 
         {/* Main Chat */}
         <div className="main-chat">

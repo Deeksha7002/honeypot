@@ -1,0 +1,13 @@
+{
+    "name": "scam-honeypot-root",
+    "version": "1.0.0",
+    "description": "Unified launcher for AI Honeypot",
+    "scripts": {
+        "dev:frontend": "cd frontend && npm run dev",
+        "dev:backend": "python backend/main.py",
+        "dev": "npx -y concurrently \"npm run dev:backend\" \"npm run dev:frontend\""
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC"
+}

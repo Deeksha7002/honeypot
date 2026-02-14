@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Fingerprint, Lock, ChevronRight, Eye, EyeOff } from 'lucide-react';
+import { ShieldCheck, Fingerprint, Lock, ChevronRight, Eye, EyeOff, UserPlus } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import '../index.css';
 
 interface LoginScreenProps {
-    onLogin: (username: string) => void;
+    onLogin?: (username: string) => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = () => {
+    const { login, register } = useAuth();
+    const [isRegistering, setIsRegistering] = useState(false);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -17,26 +21,37 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         e.preventDefault();
         setError(null);
 
-        // Basic validation
         if (!username.trim() || !password.trim()) {
             setError('CREDENTIALS REQUIRED');
             return;
         }
 
+        if (isRegistering && password !== confirmPassword) {
+            setError('PASSWORDS DO NOT MATCH');
+            return;
+        }
+
         setIsLoading(true);
 
-        // Simulate network delay for effect
-        setTimeout(() => {
-            // Mock auth logic
-            if (password.length > 0) {
-                setIsLoading(false);
-                onLogin(username);
+        try {
+            if (isRegistering) {
+                const success = await register(username, password);
+                if (!success) {
+                    setError('OPERATOR ID ALREADY TAKEN');
+                }
             } else {
-                setIsLoading(false);
-                setError('ACCESS DENIED');
+                const success = await login(username, password);
+                if (!success) {
+                    setError('ACCESS DENIED: INVALID CREDENTIALS');
+                }
             }
-        }, 1200);
+        } catch (err) {
+            setError('SYSTEM ERROR: AUTHENTICATION FAILED');
+        } finally {
+            setIsLoading(false);
+        }
     };
+
 
     return (
         <div className="login-container" style={{
@@ -86,12 +101,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                     <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: '0', letterSpacing: '2px', color: '#fff' }}>
                         SCAM<span style={{ color: '#00ff41' }}>DEFENDER</span>
                     </h1>
-                    <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '0.5rem' }}>AUTHORIZED PERSONNEL ONLY</p>
+                    <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '0.5rem' }}>
+                        {isRegistering ? 'NEW OPERATOR ENROLLMENT' : 'AUTHORIZED PERSONNEL ONLY'}
+                    </p>
                 </div>
 
                 <form onSubmit={handleSubmit}>
                     <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.8rem', color: '#888' }}>OPERATOR ID</label>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.8rem', color: '#888' }}>
+                            {isRegistering ? 'CREATE OPERATOR ID' : 'OPERATOR ID'}
+                        </label>
                         <div style={{ position: 'relative' }}>
                             <input
                                 type="text"
@@ -115,7 +134,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                     </div>
 
                     <div className="form-group" style={{ marginBottom: '2rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.8rem', color: '#888' }}>ACCESS CODE</label>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.8rem', color: '#888' }}>
+                            {isRegistering ? 'CREATE ACCESS CODE' : 'ACCESS CODE'}
+                        </label>
                         <div style={{ position: 'relative' }}>
                             <input
                                 type={showPassword ? 'text' : 'password'}
@@ -152,6 +173,34 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                             </button>
                         </div>
                     </div>
+
+                    {isRegistering && (
+                        <div className="form-group" style={{ marginBottom: '2rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.8rem', color: '#888' }}>
+                                CONFIRM ACCESS CODE
+                            </label>
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 40px 10px 40px',
+                                        background: 'rgba(0, 0, 0, 0.5)',
+                                        border: '1px solid #333',
+                                        borderRadius: '4px',
+                                        color: '#fff',
+                                        fontFamily: 'monospace',
+                                        outline: 'none'
+                                    }}
+                                    placeholder="••••••••"
+                                />
+                                <ShieldCheck size={18} color="#555" style={{ position: 'absolute', left: '12px', top: '12px' }} />
+                            </div>
+                        </div>
+                    )}
+
 
                     {error && (
                         <div style={{
@@ -191,13 +240,29 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                             <span>VERIFYING...</span>
                         ) : (
                             <>
-                                <Lock size={18} />
-                                <span>AUTHENTICATE</span>
+                                {isRegistering ? <UserPlus size={18} /> : <Lock size={18} />}
+                                <span>{isRegistering ? 'ENROLL OPERATOR' : 'AUTHENTICATE'}</span>
                                 <ChevronRight size={18} />
                             </>
                         )}
                     </button>
                 </form>
+
+                <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+                    <button
+                        onClick={() => { setIsRegistering(!isRegistering); setError(null); }}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#888',
+                            fontSize: '0.75rem',
+                            cursor: 'pointer',
+                            textDecoration: 'underline'
+                        }}
+                    >
+                        {isRegistering ? 'ALREADY HAVE AN ACCOUNT? LOGIN' : 'NEW OPERATOR? REGISTER HERE'}
+                    </button>
+                </div>
 
                 <div style={{
                     marginTop: '2rem',
@@ -213,3 +278,4 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         </div>
     );
 };
+
