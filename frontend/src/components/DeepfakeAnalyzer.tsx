@@ -82,8 +82,8 @@ export const DeepfakeAnalyzer: React.FC = () => {
         }
     };
 
-    const StatusBadge = ({ score }: { score: number }) => {
-        const color = score > 80 ? '#10b981' : score > 50 ? '#f59e0b' : '#ef4444';
+    const StatusBadge = ({ score, recommendation }: { score: number, recommendation: string }) => {
+        const color = recommendation.includes('Authentic') ? '#10b981' : recommendation.includes('Unverified') ? '#f59e0b' : '#ef4444';
         return (
             <div style={{ background: `${color}20`, color: color, padding: '4px 12px', borderRadius: '4px', fontSize: '0.8rem', border: `1px solid ${color}40`, fontWeight: 'bold' }}>
                 AUTHENTICITY: {score}%
@@ -209,14 +209,14 @@ export const DeepfakeAnalyzer: React.FC = () => {
                                     <div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
                                             <h2 style={{ fontSize: '1.2rem', margin: 0, fontWeight: 'bold' }}>FORENSIC ANALYSIS REPORT</h2>
-                                            <StatusBadge score={result.authenticityScore} />
+                                            <StatusBadge score={result.authenticityScore} recommendation={result.recommendation} />
                                         </div>
                                         <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>ID: FX-{result.timestamp.toString().slice(-8)} | CONFIDENCE: {result.confidenceLevel.toUpperCase()}</p>
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
                                         <p style={{ fontSize: '0.7rem', color: '#64748b', margin: '0 0 4px 0' }}>RECOMMENDATION</p>
                                         <span style={{
-                                            color: result.recommendation.includes('Authentic') ? '#10b981' : '#ef4444',
+                                            color: result.recommendation.includes('Authentic') ? '#10b981' : result.recommendation.includes('Unverified') ? '#f59e0b' : '#ef4444',
                                             fontWeight: 'bold',
                                             fontSize: '1.1rem',
                                             letterSpacing: '1px'
@@ -400,7 +400,7 @@ export const DeepfakeAnalyzer: React.FC = () => {
                             <span>{log.mediaType}</span>
                             <span style={{ color: log.confidence === 'High' ? '#10b981' : '#f59e0b' }}>{log.confidence}</span>
                             <span style={{ fontWeight: 'bold' }}>{log.result.authenticityScore}%</span>
-                            <span style={{ color: log.result.recommendation.includes('Authentic') ? '#10b981' : '#ef4444', fontSize: '0.75rem', fontWeight: 'bold' }}>{log.result.recommendation.toUpperCase()}</span>
+                            <span style={{ color: log.result.recommendation.includes('Authentic') ? '#10b981' : log.result.recommendation.includes('Unverified') ? '#f59e0b' : '#ef4444', fontSize: '0.75rem', fontWeight: 'bold' }}>{log.result.recommendation.toUpperCase()}</span>
                             <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 {log.action === 'BLOCKED' ? (
                                     <span style={{ background: '#ef4444', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>TERMINATED & BLOCKED</span>
