@@ -20,18 +20,18 @@ jobs:
         with:
           node-version: 18
           cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: web-app/package-lock.json
           
       - name: Install dependencies
         run: |
-          cd frontend
+          cd web-app
           npm ci
           
       - name: Build
         env:
           VITE_BASE: /honeypot/
         run: |
-          cd frontend
+          cd web-app
           npm run build
           
       - name: Setup Pages
@@ -40,7 +40,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: frontend/dist
+          path: web-app/dist
           
       - name: Deploy to GitHub Pages
         id: deployment

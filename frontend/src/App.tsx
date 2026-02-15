@@ -11,7 +11,7 @@ import { IntelligenceService } from './lib/IntelligenceService';
 import { IntelligenceReport } from './components/IntelligenceReport';
 import { soundManager } from './lib/SoundManager';
 import { GeoTracer } from './lib/GeoTracer';
-import { Play, Database, Volume2, VolumeX, ShieldAlert, LogOut, CheckCircle, BarChart3, ScanEye } from 'lucide-react';
+import { Play, Database, Volume2, VolumeX, ShieldAlert, LogOut, CheckCircle, BarChart3, ScanEye, Shield } from 'lucide-react';
 import { DeepfakeAnalyzer } from './components/DeepfakeAnalyzer';
 import { ForensicsService } from './lib/ForensicsService';
 import { MediaLogService } from './lib/MediaLogService';
@@ -19,7 +19,7 @@ import { Anonymizer } from './lib/Anonymizer';
 import { CyberCellService } from './lib/CyberCellService';
 import { useAuth } from './context/AuthContext';
 import { useThreads } from './context/ThreadProvider';
-import type { Message, Thread, CaseFile, Scenario } from './lib/types';
+import type { Message, Classification, GeoLocation, Thread, CaseFile, Scenario } from './lib/types';
 import './index.css';
 
 const EvidenceLocker = lazy(() => import('./components/EvidenceLocker').then(module => ({ default: module.EvidenceLocker })));
@@ -37,7 +37,6 @@ function App() {
   const [isMuted, setIsMuted] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
 
-  // Auto-clear notification
   useEffect(() => {
     if (notification) {
       const timer = setTimeout(() => setNotification(null), 5000);
@@ -324,7 +323,7 @@ function App() {
         addMessageToThread(threadId, {
           id: `block-${Date.now()}`,
           sender: 'system',
-          content: "🛡️ INTELLIGENCE CAPTURED: All necessary credentials obtained. Connection terminated. Scammer has been blocked from further contact.",
+          content: "🛡️ INTELLIGENCE CAPCURED: All necessary credentials obtained. Connection terminated. Scammer has been blocked from further contact.",
           timestamp: Date.now()
         });
         soundManager.playSuccess();
@@ -342,7 +341,6 @@ function App() {
         setNotification(`${alertPrefix}: ${alertMsg}`);
         soundManager.playSuccess();
       }
-
 
 
       // Generate AI Response if Thread is Active/Intercepted
@@ -419,24 +417,19 @@ function App() {
 
       const report = agent.getReport(thread.id, thread.classification || 'likely_scam', thread.messages);
 
-      const threatLevel = report.classification || thread.classification || 'likely_scam';
-      const isReported = report.autoReported || thread.autoReported || threatLevel === 'scam';
-
-      const data = {
+      cases.push({
         id: thread.id,
         scammerName: thread.senderName,
         platform: thread.source,
         status: thread.isArchived ? 'closed' : 'active',
-        threatLevel,
+
+        threatLevel: thread.classification || 'likely_scam',
         iocs: report.iocs,
         transcript: thread.messages,
         timestamp: new Date(report.timestamp).toLocaleDateString(),
         detectedLocation: thread.detectedLocation, // Map the traced location
-        autoReported: isReported
-      };
-
-      console.log(`[App] Case Entry: ${data.id}, Reported: ${data.autoReported}`);
-      cases.push(data as CaseFile);
+        autoReported: thread.autoReported
+      });
     });
 
     return cases;
@@ -458,35 +451,28 @@ function App() {
 
   return (
     <>
-      {/* Global Notification Toast */}
+      {/* GLOWING NOTIFICATION OVERLAY */}
       {notification && (
         <div style={{
           position: 'fixed',
-          top: '20px',
-          right: '20px',
+          top: '2rem',
+          left: '50%',
+          transform: 'translateX(-50%)',
           zIndex: 10000,
-          background: '#059669',
-          color: 'white',
-          padding: '12px 20px',
+          background: 'rgba(15, 23, 42, 0.95)',
+          border: '1px solid var(--primary)',
+          boxShadow: '0 0 20px rgba(59, 130, 246, 0.3)',
+          padding: '1rem 2rem',
           borderRadius: '8px',
-          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.4)',
+          color: 'var(--primary)',
+          fontWeight: 'bold',
           display: 'flex',
           alignItems: 'center',
-          gap: '12px',
-          borderLeft: '4px solid #10b981',
-          animation: 'slideIn 0.3s ease-out',
-          maxWidth: '400px',
-          fontSize: '0.9rem',
-          fontWeight: 500
+          gap: '1rem',
+          animation: 'slideDown 0.3s ease-out'
         }}>
-          <CheckCircle size={20} />
-          <span>{notification}</span>
-          <button
-            onClick={() => setNotification(null)}
-            style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: '4px', opacity: 0.7 }}
-          >
-            ✕
-          </button>
+          <Shield size={20} />
+          {notification}
         </div>
       )}
 

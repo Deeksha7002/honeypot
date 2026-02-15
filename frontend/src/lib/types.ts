@@ -64,8 +64,7 @@ export interface IncidentReport {
     iocs: IOCs;
     transcript: Message[];
     timestamp: string;
-    detectedLocation?: GeoLocation;
-    autoReported?: boolean; // New field
+    detectedLocation?: GeoLocation; // New field
 }
 
 export interface Thread {

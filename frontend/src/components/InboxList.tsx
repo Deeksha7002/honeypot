@@ -108,7 +108,6 @@ export const InboxList: React.FC<InboxListProps> = ({ threads, selectedThreadId,
                                     {getPersonaBadge(t.persona)}
                                 </div>
                             )}
-
                             {t.autoReported && (
                                 <div style={{
                                     display: 'inline-flex',
@@ -145,11 +144,11 @@ export const InboxList: React.FC<InboxListProps> = ({ threads, selectedThreadId,
                                     BLOCKED
                                 </div>
                             )}
-                        </div>
-                    </div>
+                        </div >
+                    </div >
                 ))}
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };
 

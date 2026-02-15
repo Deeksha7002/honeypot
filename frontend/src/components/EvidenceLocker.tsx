@@ -26,13 +26,6 @@ export const EvidenceLocker: React.FC<EvidenceLockerProps> = ({ cases, onClose }
 
     const selectedCase = cases.find(c => c.id === selectedCaseId);
 
-    // Safety check: ensure reported status is synced for high threats
-    const isActuallyReported = selectedCase?.autoReported || selectedCase?.threatLevel === 'scam';
-
-    if (selectedCase) {
-        console.log(`[EvidenceLocker] Viewing Case: ${selectedCase.id}, Level: ${selectedCase.threatLevel}, Reported: ${selectedCase.autoReported} (Actually: ${isActuallyReported})`);
-    }
-
     const [reportStatus, setReportStatus] = useState<'idle' | 'encrypting' | 'sent'>('idle');
     const [showLog, setShowLog] = useState(false);
 
@@ -175,17 +168,6 @@ export const EvidenceLocker: React.FC<EvidenceLockerProps> = ({ cases, onClose }
                                                 ON-FILE: {selectedCase.detectedLocation.ip}
                                             </span>
                                         )}
-                                        {isActuallyReported && (
-                                            <span className="locker-meta-tag" style={{
-                                                background: 'rgba(34, 197, 94, 0.2)',
-                                                color: '#4ade80',
-                                                border: '1px solid #22c55e',
-                                                padding: '2px 10px',
-                                                boxShadow: '0 0 10px rgba(34, 197, 94, 0.2)'
-                                            }}>
-                                                <CheckCircle size={14} /> AUTO-REPORTED
-                                            </span>
-                                        )}
                                     </div>
                                 </div>
                                 <div className="locker-header-right">
@@ -207,31 +189,23 @@ export const EvidenceLocker: React.FC<EvidenceLockerProps> = ({ cases, onClose }
                                     </div>
                                     <div className="flex flex-col items-end gap-2">
                                         <button
-                                            className={`locker-report-btn ${isActuallyReported ? 'sent' : reportStatus}`}
+                                            className={`locker-report-btn ${reportStatus}`}
                                             onClick={handleReport}
-                                            disabled={reportStatus !== 'idle' || isActuallyReported}
+                                            disabled={reportStatus !== 'idle'}
                                         >
-                                            {isActuallyReported ? (
+                                            {reportStatus === 'idle' && (
                                                 <>
-                                                    <CheckCircle size={16} /> Automatically Reported ✅
+                                                    <Send size={16} /> Report to CyberSec
                                                 </>
-                                            ) : (
+                                            )}
+                                            {reportStatus === 'encrypting' && (
                                                 <>
-                                                    {reportStatus === 'idle' && (
-                                                        <>
-                                                            <Send size={16} /> Report to CyberSec
-                                                        </>
-                                                    )}
-                                                    {reportStatus === 'encrypting' && (
-                                                        <>
-                                                            <Loader2 size={16} className="animate-spin" /> Encrypting...
-                                                        </>
-                                                    )}
-                                                    {reportStatus === 'sent' && (
-                                                        <>
-                                                            <CheckCircle size={16} /> Securely Sent
-                                                        </>
-                                                    )}
+                                                    <Loader2 size={16} className="animate-spin" /> Encrypting...
+                                                </>
+                                            )}
+                                            {reportStatus === 'sent' && (
+                                                <>
+                                                    <CheckCircle size={16} /> Securely Sent
                                                 </>
                                             )}
                                         </button>
