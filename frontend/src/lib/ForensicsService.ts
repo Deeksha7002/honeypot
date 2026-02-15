@@ -56,9 +56,10 @@ export class ForensicsService {
                 /(render|fantasy|upscaled|denoise|synthesis)/.test(lowerName)
             ),
             // Common Camera/Mobile Safelist (Explicit Real)
+            // MUST contain digits to be a real camera file (e.g. IMG_2092.jpg)
             isCameraNative: (
-                /^(img_|dsc_|pxl_|whatsapp|screenshot|capture|photo_|video_|mv_|win_)/.test(lowerName) &&
-                name.length > 10 // Must be long enough to be a real timestamped file
+                /^(img|dsc|pxl|vid|mov)[\d_]+/.test(lowerName) ||
+                /^(whatsapp|screenshot|screen_recording)/.test(lowerName)
             ),
             // Ambiguous (Generic names like "image.png", "download.jpg", "me.jpg")
             isAmbiguous: false
@@ -78,8 +79,8 @@ export class ForensicsService {
             if (detectors.isCameraNative) return 0.9 + (Math.random() * 0.08); // 90-98%
             if (isGraphic) return 0.95; // Graphics are trusted if not AI
 
-            // Ambiguous: "Unverified"
-            return 0.65 + (Math.random() * 0.1); // 65-75%
+            // Ambiguous: STRICTLY "Unverified" (Yellow)
+            return 0.55 + (Math.random() * 0.15); // 55-70% (Never > 80% Authentic)
         };
 
         const gates = {
@@ -87,7 +88,7 @@ export class ForensicsService {
             structural: getGateScore(),
             environmental: getGateScore(),
             semantic: getGateScore(),
-            metadata: detectors.isCameraNative ? 0.98 : (detectors.isAISignature ? 0.2 : 0.5), // Metadata strict for ambiguous
+            metadata: detectors.isCameraNative ? 0.98 : (detectors.isAISignature ? 0.2 : 0.4), // Metadata strict for ambiguous
             fidelity: getGateScore()
         };
 
@@ -106,8 +107,8 @@ export class ForensicsService {
 
         // Final Decision Verdict
         let verdict = 'Authentic';
-        if (detectors.isAISignature || failurePoints >= 2 || heuristicScore < 45) verdict = 'Manipulated';
-        else if (detectors.isAmbiguous && heuristicScore < 80) verdict = 'Unverified';
+        if (detectors.isAISignature || failurePoints >= 3 || heuristicScore < 45) verdict = 'Manipulated';
+        else if (detectors.isAmbiguous) verdict = 'Unverified'; // FORCE Unverified for all unknown files
 
         if (isGraphic && verdict !== 'Manipulated') {
             return {
@@ -148,7 +149,7 @@ export class ForensicsService {
         if (verdict === 'Unverified') {
             return {
                 mediaType: 'IMAGE',
-                authenticityScore: Math.round(heuristicScore), // ~65-75
+                authenticityScore: Math.round(Math.min(heuristicScore, 70)), // Cap at 70
                 confidenceLevel: 'Medium',
                 anomalyScore: Math.round(100 - heuristicScore),
                 generalizationConfidence: 60,
