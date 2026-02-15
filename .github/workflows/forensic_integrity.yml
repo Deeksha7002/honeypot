@@ -1,0 +1,39 @@
+name: Forensic Integrity Shield
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  forensic-audit:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install Dependencies
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: Verify Forensic Modules Build
+      working-directory: ./frontend
+      run: npm run build
+      env:
+        CI: true
+
+    - name: Lint Check (Code Quality)
+      working-directory: ./frontend
+      run: npm run lint

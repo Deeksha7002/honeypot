@@ -16,6 +16,27 @@ An AI-powered honeypot system designed to engage with and analyze scammers in re
 - **backend/**: Handles the AI logic, persona management, and core scam analysis routines.
 - **PWA Support**: Can be installed as a Progressive Web App for a native-like experience on desktop and mobile.
 
+## 🛡️ Zero-Trust Forensic Architecture
+
+The system employs a **Defense-in-Depth** heuristic engine to detect sophisticated deepfakes, moving beyond simple keyword matching.
+
+### 1. The 6-Gate Neural Consensus
+Every media file must pass **all 6 forensic gates** to be trusted:
+- **Optical**: Analyzes lighting vectors, shadow consistency, and reflection mapping.
+- **Structural**: Inspects cranial geometry, ear symmetry, and biological texture density.
+- **Fidelity**: Scans for GAN-noise residues, compression artifacts, and pixel-grid alignment.
+- **Semantic**: Verifies logical consistency (e.g., gravity, object permanence, background context).
+- **Metadata**: Checks for altered EXIF data and known synthetic tool signatures.
+- **Environmental**: Cross-references ambient noise/lighting with the subject's environment.
+
+### 2. The 90% Security Baseline
+- **Zero-Trust**: Any authenticity score below **90%** triggers a `Manipulated` verdict.
+- **Auto-Reporting**: High-confidence threats (Score < 90%) are automatically packaged into a generic evidence file (JSON + PDF) and flagged for the Cyber Cell.
+
+### 3. Privacy & Governance
+- **Local-First**: All analysis happens client-side. No raw images/audio leave the device.
+- **Digital Shredder**: Malicious payloads are wiped from memory immediately after evidence extraction.
+
 ## 🛠️ Setup & Running
 
 ### Requirements
