@@ -38,8 +38,8 @@ export class ForensicsService {
     private static runImageAnalysis(name: string): MediaAnalysisResult {
         const lowerName = name.toLowerCase();
 
-        // 1. ANOMALY RADAR: Initial complexity scan
-        const isGraphic = ['poster', 'graphic', 'summit', 'event', 'flyer', 'banner', 'invite', 'buildathon'].some(k => lowerName.includes(k));
+        // 1. ANOMALY RADAR: Removed "Graphic" whitelist for Zero-Trust compliance.
+        // All inputs are treated as potential threats.
 
         // 2. HEURISTIC ENGINE: Weighted Ensemble Voting
         // Universal Synthesis Scanner: Detecting "Meta-Patterns"
@@ -52,7 +52,7 @@ export class ForensicsService {
 
         // BASELINE TRUST: Lowered from 0.95 to 0.85 to catch "Unknown Unknowns" like SmartDyno
         const gates = {
-            optical: (metaPatterns.isSubjectAI || metaPatterns.isWebResource || metaPatterns.isMarketing) ? (Math.random() * 0.3 + 0.15) : 0.85,
+            optical: (metaPatterns.isSubjectAI || metaPatterns.isWebResource || metaPatterns.isMarketing) ? (Math.random() * 0.3 + 0.15) : 0.80, // Lowered to 0.80
             structural: (metaPatterns.isSubjectAI || metaPatterns.isWebResource) ? (Math.random() * 0.2 + 0.2) : 0.88,
             environmental: (lowerName.includes('castle') || lowerName.includes('sky') || lowerName.includes('neon')) ? 0.3 : 0.89,
             semantic: (lowerName.includes('floating') || lowerName.includes('fantasy') || metaPatterns.isSubjectAI) ? 0.25 : 0.90,
@@ -72,32 +72,10 @@ export class ForensicsService {
 
         // ACCURACY BOOST & ZERO-TRUST: Any score below 90% is a flag in a security context.
         const failurePoints = Object.values(gates).filter(v => v < 0.6).length;
-        const isSimulatedDeepfake = (failurePoints >= 1 || (heuristicScore < 90 && !isGraphic)) || lowerName.includes('fake');
+        const isSimulatedDeepfake = (failurePoints >= 1 || heuristicScore < 90) || lowerName.includes('fake'); // Removed !isGraphic
 
         // ADVERSARIAL SCAN
         const hasAdversarialNoise = lowerName.includes('noise') || lowerName.includes('mask') || (isSimulatedDeepfake && Math.random() > 0.7);
-
-        if (isGraphic && !lowerName.includes('fake')) {
-            return {
-                mediaType: 'IMAGE',
-                authenticityScore: 98,
-                confidenceLevel: 'High',
-                generalizationConfidence: 95,
-                anomalyScore: 5,
-                keyFindings: [
-                    'Optical: Vector-aligned lighting consistent with digital render',
-                    'Structural: Branding and Typography verified against official assets'
-                ],
-                technicalIndicators: [
-                    'Metadata: Adobe/Figma software profile signatures found',
-                    'Fidelity: Zero GAN-noise; consistent digital anti-aliasing'
-                ],
-                recommendation: 'Authentic Graphic',
-                reasoning: 'The media is a verified digital graphic. No adversarial masking or deepfake manipulation detected.',
-                timestamp: Date.now(),
-                privacyMetadata: { isLocalAnalysis: true, piiScrubbed: true }
-            };
-        }
 
         if (isSimulatedDeepfake) {
             const anomalyScore = Math.round(100 - heuristicScore + (failurePoints * 10));
