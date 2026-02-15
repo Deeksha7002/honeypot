@@ -111,6 +111,48 @@ const SCENARIOS: Scenario[] = [
             "I need you to approve it ASAP or we miss the vendor deadline.",
             "View it here: sharepoint-internal-secure.com/auth-login"
         ]
+    },
+    {
+        id: "scam_deepfake_voice",
+        type: "scam",
+        source: 'sms',
+        senderName: "Bank Fraud Dept",
+        location: "Unknown",
+        messages: [
+            "Urgent: suspicious activity on your account. Listen to this recording of the transaction authorization.",
+            "If this was not you, press 1 immediately."
+        ],
+        attachments: [
+            { type: 'AUDIO', url: '#', name: 'auth_recording_fake.mp3' }
+        ]
+    },
+    {
+        id: "scam_ai_profile",
+        type: "scam",
+        source: 'chat',
+        senderName: "Investment Guru",
+        location: "Cyprus",
+        messages: [
+            "Look at my success profile. I can help you triple your portfolio in 2 days.",
+            "Verify my identity with this photo."
+        ],
+        attachments: [
+            { type: 'IMAGE', url: '#', name: 'guru_identity_ai.jpg' }
+        ]
+    },
+    {
+        id: "benign_media_01",
+        type: "benign",
+        source: 'chat',
+        senderName: "Sarah (Work)",
+        location: "USA",
+        messages: [
+            "Here is the walkthrough for the new feature.",
+            "Let me know if it works!"
+        ],
+        attachments: [
+            { type: 'VIDEO', url: '#', name: 'walkthrough_v1.mp4' }
+        ]
     }
 ];
 

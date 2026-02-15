@@ -57,4 +57,12 @@ export class IntelligenceService {
         const ms = range === 'today' ? 24 * 3600 * 1000 : range === 'week' ? 7 * 24 * 3600 * 1000 : 30 * 24 * 3600 * 1000;
         return this.records.filter(r => now - r.timestamp < ms);
     }
+
+    /**
+     * Wipes all records from volatile memory.
+     */
+    static clearRecords() {
+        this.records = [];
+        console.log('[IntelligenceService] 🗑️ All scam records have been wiped.');
+    }
 }

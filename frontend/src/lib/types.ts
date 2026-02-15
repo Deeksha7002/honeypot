@@ -6,6 +6,12 @@ export interface Message {
     content: string;
     timestamp: number;
     isRedacted?: boolean;
+    attachments?: {
+        type: MediaType;
+        url: string;
+        name: string;
+        isShredded?: boolean;
+    }[];
 }
 
 export type Classification = 'scam' | 'likely_scam' | 'benign';
@@ -18,6 +24,12 @@ export interface Scenario {
     relationalContext?: 'family' | 'work' | 'friend';
     location?: string; // e.g. "Nigeria", "Russia", "Unknown"
     messages: string[];
+    attachments?: {
+        type: MediaType;
+        url: string;
+        name: string;
+        isShredded?: boolean;
+    }[];
 }
 
 export interface IOCs {
@@ -108,4 +120,35 @@ export interface IntelligenceSummary {
     byType: Record<ScamType, number>;
     uniqueScammers: number;
     repeatedIdentifiers: string[];
+}
+
+export type MediaType = 'IMAGE' | 'AUDIO' | 'VIDEO';
+
+export interface MediaAnalysisResult {
+    mediaType: MediaType;
+    authenticityScore: number; // 0-100
+    confidenceLevel: 'Low' | 'Medium' | 'High';
+    keyFindings: string[];
+    technicalIndicators: string[];
+    recommendation: 'Authentic' | 'Likely Authentic' | 'Inconclusive' | 'Likely Manipulated' | 'Manipulated' | 'Authentic Graphic';
+    reasoning: string;
+    anomalyScore?: number; // 0-100 (Unseen patterns)
+    generalizationConfidence?: number; // 0-100
+    isAdversarial?: boolean;
+    timestamp: number;
+    privacyMetadata?: {
+        isLocalAnalysis: boolean;
+        piiScrubbed: boolean;
+    };
+}
+
+export interface ForensicLog {
+    id: string;
+    senderId: string;
+    senderName: string;
+    mediaType: MediaType;
+    confidence: 'Low' | 'Medium' | 'High';
+    action: 'STORED' | 'REPORTED' | 'BLOCKED';
+    timestamp: number;
+    result: MediaAnalysisResult;
 }

@@ -1,4 +1,7 @@
 import { PDFGenerator } from './PDFGenerator';
+import { EgressFilter } from './EgressFilter';
+import { IntelligenceService } from './IntelligenceService';
+import { MediaLogService } from './MediaLogService';
 import type { IncidentReport, CaseFile } from './types';
 
 export class CyberCellService {
@@ -28,10 +31,17 @@ export class CyberCellService {
                 }))
             };
 
+            // SECURITY ENFORCEMENT: Egress Inspection
+            const { isSafe, violations } = EgressFilter.inspect(evidenceJson);
+            if (!isSafe) {
+                console.error(`%c[EgressShield] 🚫 BLOCKING TRANSMISSION: ${violations.join(', ')}`, 'color: #ef4444; font-weight: bold;');
+                return false;
+            }
+
             const jsonSize = new TextEncoder().encode(JSON.stringify(evidenceJson)).length;
             console.log(`%c[CyberCellService] 📄 Forensic JSON Payload generated (${(jsonSize / 1024).toFixed(2)} KB)`, 'color: #3b82f6; font-style: italic;');
 
-            // 2. Generate PDF Evidence (using existing logic)
+            // 2. Generate PDF Evidence
             const caseShim: CaseFile = {
                 id: report.conversationId,
                 scammerName: "Identified Threat",
@@ -59,5 +69,15 @@ export class CyberCellService {
             console.error('[CyberCellService] ❌ Failed to auto-report:', error);
             return false;
         }
+    }
+
+    /**
+     * Instantly wipes all volatile intelligence data from the current session.
+     */
+    static clearSession() {
+        console.warn('[CyberCellService] ⚠️ INITIATING DATA WIPE PROTOCOL...');
+        IntelligenceService.clearRecords();
+        MediaLogService.clearLogs();
+        console.log('[CyberCellService] ✅ ALL VOLATILE DATA SHREDDED.');
     }
 }

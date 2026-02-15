@@ -11,7 +11,12 @@ import { IntelligenceService } from './lib/IntelligenceService';
 import { IntelligenceReport } from './components/IntelligenceReport';
 import { soundManager } from './lib/SoundManager';
 import { GeoTracer } from './lib/GeoTracer';
-import { Play, Database, Volume2, VolumeX, ShieldAlert, LogOut, CheckCircle, BarChart3 } from 'lucide-react';
+import { Play, Database, Volume2, VolumeX, ShieldAlert, LogOut, CheckCircle, BarChart3, ScanEye } from 'lucide-react';
+import { DeepfakeAnalyzer } from './components/DeepfakeAnalyzer';
+import { ForensicsService } from './lib/ForensicsService';
+import { MediaLogService } from './lib/MediaLogService';
+import { Anonymizer } from './lib/Anonymizer';
+import { CyberCellService } from './lib/CyberCellService';
 import { useAuth } from './context/AuthContext';
 import { useThreads } from './context/ThreadProvider';
 import type { Message, Thread, CaseFile, Scenario } from './lib/types';
@@ -28,6 +33,7 @@ function App() {
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [showIntelligence, setShowIntelligence] = useState(false);
   const [showLocker, setShowLocker] = useState(false);
+  const [showForensics, setShowForensics] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
 
@@ -116,7 +122,7 @@ function App() {
 
     // Inject initial message immediately and trigger AI flow (silent mode)
     const initialMsg = scenario.messages[0];
-    handleIncomingMessage(threadId, initialMsg, 'scammer', scenario.senderName, scenario.id, true);
+    handleIncomingMessage(threadId, initialMsg, 'scammer', scenario.senderName, scenario.id, scenario.attachments, true);
   };
 
   const spawnThread = () => {
@@ -148,21 +154,99 @@ function App() {
     // setSelectedThreadId(prev => prev || threadId); // Don't auto-select so user can see Dashboard
 
     const initialMsg = scenario.messages[0];
-    handleIncomingMessage(threadId, initialMsg, 'scammer', scenario.senderName, scenario.id);
+    handleIncomingMessage(threadId, initialMsg, 'scammer', scenario.senderName, scenario.id, scenario.attachments);
   };
 
-  const handleIncomingMessage = async (threadId: string, content: string, sender: 'scammer' | 'agent', senderName?: string, scenarioId?: string, silent: boolean = false) => {
+  const handleIncomingMessage = async (
+    threadId: string,
+    content: string,
+    sender: 'scammer' | 'agent' | 'system',
+    senderName?: string,
+    scenarioId?: string,
+    attachments?: any[], // Using any[] for brevity in replacement, will map to MediaType properly
+    silent: boolean = false
+  ) => {
+    const threadStateAtStart = threadsRef.current.find(t => t.id === threadId);
+    if (threadStateAtStart?.isBlocked && sender !== 'system') return;
+
     addMessageToThread(threadId, {
       id: Math.random().toString(36),
       sender,
       senderName,
       content,
       timestamp: Date.now(),
-      isRedacted: false
+      isRedacted: false,
+      attachments
     });
 
     if (sender === 'scammer') {
       if (!silent) soundManager.playNotification();
+
+      // AUTOMATED FORENSICS CHECK
+      let isMediaMalicious = false;
+      if (attachments && attachments.length > 0) {
+        setNotification("🔍 AUTOMATED FORENSICS: Analyzing incoming media...");
+
+        for (const attachment of attachments) {
+          const result = await ForensicsService.analyzeAutomated(Anonymizer.sanitizeFilename(attachment.name), attachment.type);
+          const isFake = result.recommendation.includes('Manipulated') || result.authenticityScore < 40;
+
+          MediaLogService.addLog({
+            id: `log-${Date.now()}-${Math.random()}`,
+            senderId: Anonymizer.anonymize(threadId),
+            senderName: Anonymizer.anonymize(senderName || 'Unknown'),
+            mediaType: attachment.type,
+            confidence: result.confidenceLevel,
+            action: isFake ? 'BLOCKED' : 'STORED',
+            timestamp: Date.now(),
+            result
+          });
+
+          if (isFake) {
+            isMediaMalicious = true;
+
+            // 1. SECURE SHREDDING: Wipe the media URL immediately
+            const originalName = attachment.name;
+            attachment.url = ""; // Shredded: No trace left in memory
+            attachment.isShredded = true;
+
+            // 2. PRIVACY-FIRST REPORTING: Forward to Cyber Cell
+            CyberCellService.autoReport({
+              conversationId: threadId,
+              classification: 'scam',
+              timestamp: new Date().toISOString(),
+              confidenceScore: result.authenticityScore,
+              transcript: [], // Actual reporting logic should pull thread history if needed
+              iocs: {
+                urls: [],
+                domains: [],
+                paymentMethods: [],
+                sensitiveDataRedacted: 0
+              }
+            });
+
+            console.warn(`%c[Shredder] ☢️ AUTOMATED DESTRUCTION COMPLETE: ${originalName} has been shredded into a million pieces.`, 'color: #ef4444; font-weight: bold;');
+            break;
+          }
+        }
+      }
+
+      if (isMediaMalicious) {
+        setNotification("🚨 FORENSICS ALERT: DEEPFAKE DETECTED. TERMINATING CONNECTION.");
+        soundManager.playAlert();
+
+        setThreads((prev: Thread[]) => prev.map(t => t.id === threadId ? { ...t, isBlocked: true, classification: 'scam' } : t));
+
+        addMessageToThread(threadId, {
+          id: `block-auto-${Date.now()}`,
+          sender: 'system',
+          content: "🛡️ AUTOMATED DEFENSE: Deepfake/Synthetic media detected. Evidence preserved and forwarded to Cyber Cell. Sender has been permanently blocked.",
+          timestamp: Date.now()
+        });
+
+        return; // HALT all further processing for this thread
+      }
+
       // Allow slight processing delay (simulated)
       await new Promise(r => setTimeout(r, 1200 + Math.random() * 500));
 
@@ -272,7 +356,7 @@ function App() {
         if (response) {
           // AI types for 1-2 seconds
           await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
-          handleIncomingMessage(threadId, response, 'agent', undefined, scenarioId, silent);
+          handleIncomingMessage(threadId, response, 'agent', undefined, scenarioId, undefined, silent);
 
           if (scenarioId) {
             // Simulate scammer replying back to the bait
@@ -297,7 +381,7 @@ function App() {
               // RECURSION: This keeps the loop alive
               try {
                 console.log(`[Loop] Scammer replying in thread ${threadId} (Scenario: ${scenarioId})`);
-                handleIncomingMessage(threadId, reply, 'scammer', undefined, scenarioId, silent);
+                handleIncomingMessage(threadId, reply, 'scammer', undefined, scenarioId, undefined, silent);
               } catch (e) {
                 console.error("Recursion error:", e);
               }
@@ -443,10 +527,13 @@ function App() {
             ) : (
               <>
 
-                <button onClick={() => { setShowLocker(!showLocker); setShowIntelligence(false); }} className={`nav-btn ${showLocker ? 'active' : ''}`}>
+                <button onClick={() => { setShowLocker(!showLocker); setShowIntelligence(false); setShowForensics(false); }} className={`nav-btn ${showLocker ? 'active' : ''}`}>
                   <Database size={18} /> Intelligence Locker
                 </button>
-                <button onClick={() => { setShowIntelligence(!showIntelligence); setShowLocker(false); }} className={`nav-btn ${showIntelligence ? 'active' : ''}`} style={{ borderColor: 'var(--status-info)', color: 'var(--status-info)' }}>
+                <button onClick={() => { setShowForensics(!showForensics); setShowLocker(false); setShowIntelligence(false); }} className={`nav-btn ${showForensics ? 'active' : ''}`} style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}>
+                  <ScanEye size={18} /> Forensics Lab
+                </button>
+                <button onClick={() => { setShowIntelligence(!showIntelligence); setShowLocker(false); setShowForensics(false); }} className={`nav-btn ${showIntelligence ? 'active' : ''}`} style={{ borderColor: 'var(--status-info)', color: 'var(--status-info)' }}>
                   <BarChart3 size={18} /> Monitor Intelligence
                 </button>
               </>
@@ -624,6 +711,21 @@ function App() {
                 ×
               </button>
               <IntelligenceReport />
+            </div>
+          </div>
+        )
+      }
+      {
+        showForensics && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.98)', overflowY: 'auto' }}>
+            <div style={{ maxWidth: '1200px', margin: '2rem auto', background: '#0f172a', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', position: 'relative', minHeight: '80vh', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
+              <button
+                onClick={() => setShowForensics(false)}
+                style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'rgba(255,255,255,0.05)', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.5rem', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}
+              >
+                ×
+              </button>
+              <DeepfakeAnalyzer />
             </div>
           </div>
         )

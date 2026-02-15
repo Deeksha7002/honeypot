@@ -911,6 +911,20 @@ body {
   pointer-events: none;
 }
 
+@keyframes pulse-security {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+
+  70% {
+    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
 .lock-container {
   position: relative;
   z-index: 10;
@@ -1311,4 +1325,29 @@ body {
 .locker-sidebar-footer {
   padding: 1rem;
   border-top: 1px solid var(--border-color);
+}
+
+/* --- SHREDDING ANIMATIONS --- */
+@keyframes shred-scan {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+}
+
+.shredded-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.1) 0px, rgba(0, 0, 0, 0.1) 1px, transparent 1px, transparent 2px);
+  pointer-events: none;
 }

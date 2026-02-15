@@ -40,6 +40,48 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ messages }) => {
                                 {msg.content}
                             </div>
 
+                            {msg.attachments?.map((at, i) => (
+                                <div key={i} className="attachment-container" style={{ marginTop: '0.5rem' }}>
+                                    {at.isShredded ? (
+                                        <div className="shredded-container" style={{
+                                            background: 'linear-gradient(45deg, #000, #1a1a1a)',
+                                            border: '2px dashed #ef4444',
+                                            padding: '1rem',
+                                            borderRadius: '8px',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            gap: '0.5rem',
+                                            position: 'relative',
+                                            overflow: 'hidden'
+                                        }}>
+                                            <div className="shred-glitch" style={{ fontSize: '1.5rem', filter: 'grayscale(1) contrast(2)' }}>🧩</div>
+                                            <span style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '0.7rem', letterSpacing: '1px' }}>
+                                                ☢️ MALICIOUS FILE SHREDDED
+                                            </span>
+                                            <span style={{ color: '#94a3b8', fontSize: '0.6rem', textAlign: 'center' }}>
+                                                Forwarded to Cyber Cell. Millions of fragments unrecoverable.
+                                            </span>
+                                            {/* Shredding animation line */}
+                                            <div style={{
+                                                position: 'absolute',
+                                                top: 0,
+                                                left: 0,
+                                                width: '100%',
+                                                height: '2px',
+                                                background: '#ef4444',
+                                                boxShadow: '0 0 10px #ef4444',
+                                                animation: 'shred-scan 2s linear infinite'
+                                            }} />
+                                        </div>
+                                    ) : (
+                                        <div className="media-preview" style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', fontSize: '0.8rem' }}>
+                                            📎 {at.name} ({at.type})
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+
                             {msg.isRedacted && (
                                 <div className="redacted-badge">
                                     <ShieldAlert size={10} />
