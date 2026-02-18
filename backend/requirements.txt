@@ -3,3 +3,7 @@
 # Keeping it ready for future integrations.
 requests==2.32.3
 python-dotenv==1.0.1
+fastapi
+uvicorn
+pydantic
+

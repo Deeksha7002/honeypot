@@ -4,7 +4,7 @@
     "description": "Unified launcher for AI Honeypot",
     "scripts": {
         "dev:frontend": "cd frontend && npm run dev",
-        "dev:backend": "python backend/main.py",
+        "dev:backend": "python backend/server.py",
         "dev": "npx -y concurrently \"npm run dev:backend\" \"npm run dev:frontend\""
     },
     "keywords": [],
