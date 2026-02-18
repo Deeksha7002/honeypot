@@ -1,0 +1,196 @@
+import React, { useState } from 'react';
+import { HoneypotAgent } from '../lib/HoneypotAgent';
+import { Shield, ShieldAlert, CheckCircle, AlertTriangle, Play, RefreshCw, Terminal, Search, Zap } from 'lucide-react';
+
+export const DemoConsole: React.FC = () => {
+    const [input, setInput] = useState('');
+    const [result, setResult] = useState<any | null>(null);
+    const [analyzing, setAnalyzing] = useState(false);
+
+    const handleAnalyze = async () => {
+        if (!input.trim()) return;
+        setAnalyzing(true);
+        setResult(null);
+
+        // Simulate processing time for realism
+        await new Promise(r => setTimeout(r, 1200));
+
+        const agent = new HoneypotAgent();
+        // We use a dummy ID and context
+        const analysis = agent.ingest(input, 'demo-session');
+
+        console.log("Demo Analysis:", analysis);
+        setResult(analysis);
+        setAnalyzing(false);
+    };
+
+    const handleReset = () => {
+        setInput('');
+        setResult(null);
+    };
+
+    return (
+        <div style={{ padding: '2rem', color: '#e2e8f0', height: '100%', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1.5rem' }}>
+                <div style={{ background: '#8b5cf6', padding: '12px', borderRadius: '8px' }}>
+                    <Terminal size={24} color="#fff" />
+                </div>
+                <div>
+                    <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0, letterSpacing: '1px' }}>THREAT SIMULATION LAB</h1>
+                    <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: 0 }}>Manual heuristic verification environment</p>
+                </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', flex: 1 }}>
+                {/* Input Section */}
+                <div className="sys-card" style={{ display: 'flex', flexDirection: 'column' }}>
+                    <h3 style={{ fontSize: '1rem', color: '#a78bfa', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Search size={16} /> INPUT VECTOR
+                    </h3>
+                    <textarea
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        placeholder="Paste suspicious text, email content, or SMS message here to test the detection engine..."
+                        spellCheck={false}
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        style={{
+                            flex: 1,
+                            background: 'rgba(0,0,0,0.3)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '8px',
+                            padding: '1rem',
+                            color: '#fff',
+                            fontFamily: 'monospace',
+                            fontSize: '0.9rem',
+                            resize: 'none',
+                            outline: 'none',
+                            marginBottom: '1.5rem'
+                        }}
+                    />
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                        <button
+                            onClick={handleAnalyze}
+                            disabled={analyzing || !input.trim()}
+                            className="btn"
+                            style={{
+                                flex: 1,
+                                background: analyzing ? 'rgba(139, 92, 246, 0.5)' : '#8b5cf6',
+                                color: 'white', border: 'none',
+                                padding: '12px',
+                                fontWeight: 'bold',
+                                opacity: (analyzing || !input.trim()) ? 0.7 : 1,
+                                cursor: (analyzing || !input.trim()) ? 'not-allowed' : 'pointer'
+                            }}
+                        >
+                            {analyzing ? (
+                                <><RefreshCw className="spin-slow" size={18} /> PROCESSING...</>
+                            ) : (
+                                <><Play size={18} /> RUN ANALYSIS</>
+                            )}
+                        </button>
+                        <button
+                            onClick={handleReset}
+                            className="btn"
+                            style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8' }}
+                        >
+                            CLEAR
+                        </button>
+                    </div>
+                </div>
+
+                {/* proper Analysis Output */}
+                <div className="sys-card" style={{ display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+                    <h3 style={{ fontSize: '1rem', color: '#a78bfa', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Zap size={16} /> ENGINE OUTPUT
+                    </h3>
+
+                    {!result && !analyzing && (
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', opacity: 0.3 }}>
+                            <Shield size={64} style={{ marginBottom: '1rem' }} />
+                            <p>WAITING FOR INPUT</p>
+                        </div>
+                    )}
+
+                    {analyzing && (
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+                            <div className="scan-bar-bg" style={{ width: '200px', marginBottom: '1rem' }}>
+                                <div className="scan-bar-fill" style={{ width: '100%', animation: 'scan 1s infinite linear', background: '#8b5cf6' }} />
+                            </div>
+                            <p style={{ color: '#a78bfa', fontFamily: 'monospace' }}>HEURISITC SCAN IN PROGRESS...</p>
+                        </div>
+                    )}
+
+                    {result && !analyzing && (
+                        <div style={{ animation: 'slideDown 0.3s ease-out' }}>
+                            <div style={{
+                                padding: '1.5rem',
+                                borderRadius: '8px',
+                                background: result.classification === 'scam' ? 'rgba(239, 68, 68, 0.1)' :
+                                    result.classification === 'likely_scam' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                                border: `1px solid ${result.classification === 'scam' ? '#ef4444' :
+                                    result.classification === 'likely_scam' ? '#f59e0b' : '#10b981'
+                                    }`,
+                                marginBottom: '1.5rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '1rem'
+                            }}>
+                                <div>
+                                    {result.classification === 'scam' ? <ShieldAlert size={32} color="#ef4444" /> :
+                                        result.classification === 'likely_scam' ? <AlertTriangle size={32} color="#f59e0b" /> :
+                                            <CheckCircle size={32} color="#10b981" />}
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '0.9rem', color: '#94a3b8', fontWeight: 'bold' }}>VERDICT</div>
+                                    <div style={{
+                                        fontSize: '1.5rem', fontWeight: 'bold',
+                                        color: result.classification === 'scam' ? '#ef4444' :
+                                            result.classification === 'likely_scam' ? '#f59e0b' : '#10b981'
+                                    }}>
+                                        {result.classification === 'scam' ? 'MALICIOUS THREAT DETECTED' :
+                                            result.classification === 'likely_scam' ? 'SUSPICIOUS ACTIVITY' : 'SAFE / BENIGN'}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px' }}>
+                                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.5rem' }}>THREAT SCORE</div>
+                                    <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#fff' }}>{result.score}/100</div>
+                                </div>
+                                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px' }}>
+                                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.5rem' }}>DETECTED INTENT</div>
+                                    <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#fff' }}>{result.intent}</div>
+                                </div>
+                            </div>
+
+                            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', color: '#94a3b8' }}>CAPTURED INDICATORS (IOCs)</h4>
+                                {result.iocs && result.iocs.length > 0 ? (
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                        {result.iocs.map((ioc: string, i: number) => (
+                                            <span key={i} style={{
+                                                fontSize: '0.75rem',
+                                                background: 'rgba(239, 68, 68, 0.2)',
+                                                color: '#fca5a5',
+                                                padding: '2px 8px',
+                                                borderRadius: '4px',
+                                                border: '1px solid rgba(239, 68, 68, 0.3)'
+                                            }}>
+                                                {ioc}
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>No specific IOCs extracted from this sample.</div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};

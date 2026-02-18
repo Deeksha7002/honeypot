@@ -11,7 +11,8 @@ import { IntelligenceService } from './lib/IntelligenceService';
 import { IntelligenceReport } from './components/IntelligenceReport';
 import { soundManager } from './lib/SoundManager';
 import { GeoTracer } from './lib/GeoTracer';
-import { Play, Database, Volume2, VolumeX, ShieldAlert, LogOut, BarChart3, ScanEye, Shield } from 'lucide-react';
+import { DemoConsole } from './components/DemoConsole';
+import { Play, Database, Volume2, VolumeX, ShieldAlert, LogOut, BarChart3, ScanEye, Shield, Zap } from 'lucide-react';
 import { DeepfakeAnalyzer } from './components/DeepfakeAnalyzer';
 import { ForensicsService } from './lib/ForensicsService';
 import { MediaLogService } from './lib/MediaLogService';
@@ -24,16 +25,15 @@ import './index.css';
 
 const EvidenceLocker = lazy(() => import('./components/EvidenceLocker').then(module => ({ default: module.EvidenceLocker })));
 
+type ViewState = 'DASHBOARD' | 'LOCKER' | 'FORENSICS' | 'INTELLIGENCE' | 'DEMO';
 
 function App() {
   const { threads, setThreads, clearThreads } = useThreads();
   const { isAuthenticated, logout } = useAuth();
 
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<ViewState>('DASHBOARD');
   const [isMonitoring, setIsMonitoring] = useState(false);
-  const [showIntelligence, setShowIntelligence] = useState(false);
-  const [showLocker, setShowLocker] = useState(false);
-  const [showForensics, setShowForensics] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
 
@@ -44,17 +44,12 @@ function App() {
     }
   }, [notification]);
 
-
-
-
-
   const isMonitoringRef = useRef(false);
   const apiRef = useRef(new MockScammerAPI());
   const agentsRef = useRef<Map<string, HoneypotAgent>>(new Map());
   const scammerProgressRef = useRef<Map<string, number>>(new Map());
-
-  // Ref to track threads state preventing stale closures in async recursive calls
   const threadsRef = useRef<Thread[]>([]);
+
   useEffect(() => {
     threadsRef.current = threads;
   }, [threads]);
@@ -76,16 +71,13 @@ function App() {
     spawnThread();
     await new Promise(r => setTimeout(r, 2000));
     spawnThread();
+    await new Promise(r => setTimeout(r, 2000));
   };
 
   // Botnet Simulation Mode
   const triggerBotnetMode = async () => {
     if (!isMonitoringRef.current) startMonitoring();
-
-    // Generate 50 threats instantly
     const botnetBatch = apiRef.current.generateBatch(50);
-
-    // Ingest them with a stagger effect for visual impact
     for (let i = 0; i < botnetBatch.length; i++) {
       spawnBotnetThread(botnetBatch[i]);
       if (i % 5 === 0) await new Promise(r => setTimeout(r, 100)); // Slight stagger
@@ -94,11 +86,10 @@ function App() {
   };
 
   const spawnBotnetThread = (scenario: Scenario) => {
-
     const threadId = scenario.id;
     const agent = new HoneypotAgent();
     agentsRef.current.set(threadId, agent);
-    scammerProgressRef.current.set(threadId, 1); // Start tracking from next message (1)
+    scammerProgressRef.current.set(threadId, 1);
 
     const newThread: Thread = {
       id: threadId,
@@ -107,8 +98,8 @@ function App() {
       source: scenario.source,
       messages: [],
       classification: null,
-      isIntercepted: scenario.type === 'scam', // Only intercept if it's actually a scam
-      isScanning: false, // Skip scanning for botnet, assume detected if scam
+      isIntercepted: scenario.type === 'scam',
+      isScanning: false,
       location: scenario.location,
       detectedLocation: GeoTracer.trace(scenario.location),
       avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${scenario.senderName}`,
@@ -116,10 +107,7 @@ function App() {
       isArchived: false
     };
 
-    setThreads((prev: Thread[]) => [newThread, ...prev]); // Add to top
-
-
-    // Inject initial message immediately and trigger AI flow (silent mode)
+    setThreads((prev: Thread[]) => [newThread, ...prev]);
     const initialMsg = scenario.messages[0];
     handleIncomingMessage(threadId, initialMsg, 'scammer', scenario.senderName, scenario.id, scenario.attachments, true);
   };
@@ -130,7 +118,7 @@ function App() {
     const threadId = Math.random().toString(36).substring(7);
     const agent = new HoneypotAgent();
     agentsRef.current.set(threadId, agent);
-    scammerProgressRef.current.set(threadId, 1); // Start tracking from next message
+    scammerProgressRef.current.set(threadId, 1);
 
     const newThread: Thread = {
       id: threadId,
@@ -149,9 +137,6 @@ function App() {
     };
 
     setThreads((prev: Thread[]) => [...prev, newThread]);
-
-    // setSelectedThreadId(prev => prev || threadId); // Don't auto-select so user can see Dashboard
-
     const initialMsg = scenario.messages[0];
     handleIncomingMessage(threadId, initialMsg, 'scammer', scenario.senderName, scenario.id, scenario.attachments);
   };
@@ -203,19 +188,15 @@ function App() {
 
           if (isFake) {
             isMediaMalicious = true;
-
-            // 1. SECURE SHREDDING: Wipe the media URL immediately
-            const originalName = attachment.name;
-            attachment.url = ""; // Shredded: No trace left in memory
+            attachment.url = ""; // Shredded
             attachment.isShredded = true;
 
-            // 2. PRIVACY-FIRST REPORTING: Forward to Cyber Cell
             CyberCellService.autoReport({
               conversationId: threadId,
               classification: 'scam',
               timestamp: new Date().toISOString(),
               confidenceScore: result.authenticityScore,
-              transcript: [], // Actual reporting logic should pull thread history if needed
+              transcript: [],
               iocs: {
                 urls: [],
                 domains: [],
@@ -224,7 +205,7 @@ function App() {
               }
             });
 
-            console.warn(`%c[Shredder] ☢️ AUTOMATED DESTRUCTION COMPLETE: ${originalName} has been shredded into a million pieces.`, 'color: #ef4444; font-weight: bold;');
+            console.warn(`%c[Shredder] ☢️ AUTOMATED DESTRUCTION COMPLETE`, 'color: #ef4444; font-weight: bold;');
             break;
           }
         }
@@ -233,37 +214,28 @@ function App() {
       if (isMediaMalicious) {
         setNotification("🚨 FORENSICS ALERT: DEEPFAKE DETECTED. TERMINATING CONNECTION.");
         soundManager.playAlert();
-
         setThreads((prev: Thread[]) => prev.map(t => t.id === threadId ? { ...t, isBlocked: true, classification: 'scam' } : t));
-
         addMessageToThread(threadId, {
           id: `block-auto-${Date.now()}`,
           sender: 'system',
           content: "🛡️ AUTOMATED DEFENSE: Deepfake/Synthetic media detected. Evidence preserved and forwarded to Cyber Cell. Sender has been permanently blocked.",
           timestamp: Date.now()
         });
-
-        return; // HALT all further processing for this thread
+        return;
       }
 
-      // Allow slight processing delay (simulated)
       await new Promise(r => setTimeout(r, 1200 + Math.random() * 500));
 
-      // Retrieve (or recover) the agent
       let agent = agentsRef.current.get(threadId);
       if (!agent) {
-        // Defensive: Recover agent if missing
         agent = new HoneypotAgent();
         agentsRef.current.set(threadId, agent);
       }
 
       const scenario = scenarioId ? apiRef.current.getScenario(scenarioId) : undefined;
       const relationalContext = scenario?.relationalContext;
-
-      // Classify the incoming message
       const { classification, safeText, intent, score, isCompromised, autoReported, missionComplete, scamType, iocs } = agent.ingest(content, threadId, relationalContext);
 
-      // Record in Intelligence Service if it's a scam
       if (classification === 'scam' || classification === 'likely_scam') {
         IntelligenceService.recordScam({
           type: scamType,
@@ -273,42 +245,27 @@ function App() {
         });
       }
 
-
-
-      // Check interception status from current state + new classification
-      // Check interception status from current state + new classification
-      // CRITICAL FIX: Use threadsRef to get latest state, avoiding stale closures in recursive calls
       const threadState = threadsRef.current.find(t => t.id === threadId);
       const wasIntercepted = threadState?.isIntercepted || false;
       const isNewInterception = classification === 'scam' || classification === 'likely_scam';
-
-      // Log the decision factors
-      console.log(`[Thread ${threadId}] Processing message. ScenarioId: ${scenarioId}, Class: ${classification}, WasIntercepted: ${wasIntercepted}`);
-
-      // Logic refined: Only reply if it's explicitly a scam (new or existing).
-      // AND Only if the mission is not yet complete (Capture & Kill Policy)
       const shouldReply = (isNewInterception || wasIntercepted) && !missionComplete && !threadState?.isBlocked;
-      console.log(`[Thread ${threadId}] Should Reply? ${shouldReply} (MissionComplete: ${missionComplete}, Blocked: ${threadState?.isBlocked})`);
 
       setThreads((prev: Thread[]) => prev.map((t: Thread) => {
         if (t.id !== threadId) return t;
-
-        // Trigger alert sound if this is a new interception (and not silent)
         if (!t.isIntercepted && isNewInterception && !silent) {
           soundManager.playAlert();
         }
-
         return {
           ...t,
           classification,
-          isIntercepted: shouldReply || (missionComplete && t.isIntercepted), // Maintain intercepted status even if blocked
+          isIntercepted: shouldReply || (missionComplete && t.isIntercepted),
           isScanning: false,
           isBlocked: missionComplete || t.isBlocked,
-          persona: agent!.currentPersona, // Use non-null assertion or optional chaining
+          persona: agent!.currentPersona,
           intent,
           threatScore: score,
           isCompromised: isCompromised || t.isCompromised,
-          autoReported: autoReported || t.autoReported, // Capture auto-reporting status
+          autoReported: autoReported || t.autoReported,
           messages: t.messages.map((m: Message, idx: number) => {
             if (idx === t.messages.length - 1 && m.sender === 'scammer') {
               return { ...m, content: safeText, isRedacted: safeText !== content };
@@ -318,19 +275,17 @@ function App() {
         };
       }));
 
-      // If mission is complete, add a system notification message and block further interaction
       if (missionComplete && !threadState?.isBlocked) {
         addMessageToThread(threadId, {
           id: `block-${Date.now()}`,
           sender: 'system',
-          content: "🛡️ INTELLIGENCE CAPCURED: All necessary credentials obtained. Connection terminated. Scammer has been blocked from further contact.",
+          content: "🛡️ INTELLIGENCE CAPTURED: All necessary credentials obtained. Connection terminated. Scammer has been blocked from further contact.",
           timestamp: Date.now()
         });
         soundManager.playSuccess();
         setNotification(`Mission Complete: Scammer blocked for ${senderName || 'Unknown'}`);
       }
 
-      // Trigger Notification for Auto-Reporting
       if (autoReported && !threadState?.autoReported) {
         const isCompromise = isCompromised || threadState?.isCompromised;
         const alertPrefix = isCompromise ? "🚩 COMPROMISE ALERT" : "🚨 AUTO-REPORTED";
@@ -342,49 +297,26 @@ function App() {
         soundManager.playSuccess();
       }
 
-
-      // Generate AI Response if Thread is Active/Intercepted
       if (shouldReply) {
-        // Force 'scam' classification for response generation if we are replying to a "benign" message in a scam thread
         const effectiveClassification = (classification === 'benign') ? 'scam' : classification;
         const response = agent.generateResponse(effectiveClassification, content);
-
-        console.log(`[Thread ${threadId}] Generated AI response: "${response?.substring(0, 20)}..."`);
-
         if (response) {
-          // AI types for 1-2 seconds
           await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
           handleIncomingMessage(threadId, response, 'agent', undefined, scenarioId, undefined, silent);
 
           if (scenarioId) {
-            // Simulate scammer replying back to the bait
-            // Determine next step
             const currentStep = scammerProgressRef.current.get(threadId) || 1;
-            console.log(`[Thread ${threadId}] Fetching scammer reply for step ${currentStep}`);
             let reply = await apiRef.current.getReplyForScenario(scenarioId, currentStep);
-
-            // Failsafe: If reply is null even with fallback logic, force a generic one
-            if (!reply) {
-              console.warn(`[Thread ${threadId}] API returned null reply! Forcing fallback.`);
-              reply = "What did you say?";
-            }
+            if (!reply) reply = "What did you say?";
 
             if (reply) {
-              // Increment step for next time
               scammerProgressRef.current.set(threadId, currentStep + 1);
-
-              // Reduced delay to keep momentum
               await new Promise(r => setTimeout(r, 1500 + Math.random() * 1000));
-
-              // RECURSION: This keeps the loop alive
               try {
-                console.log(`[Loop] Scammer replying in thread ${threadId} (Scenario: ${scenarioId})`);
                 handleIncomingMessage(threadId, reply, 'scammer', undefined, scenarioId, undefined, silent);
               } catch (e) {
                 console.error("Recursion error:", e);
               }
-            } else {
-              console.error(`[Loop] Scammer WENT SILENT in thread ${threadId}. Reply was null.`);
             }
           }
         }
@@ -401,74 +333,44 @@ function App() {
     }));
   };
 
-
   const getCaseFiles = (): CaseFile[] => {
     const cases: CaseFile[] = [];
-
-
     threads.forEach((thread: Thread) => {
-
-      // Only create cases for active threats or scanned threads
       if (!thread.classification && !thread.isIntercepted) return;
-      if (thread.classification === 'benign') return; // Optional: Hide safe threads
-
+      if (thread.classification === 'benign') return;
       const agent = agentsRef.current.get(thread.id);
       if (!agent) return;
-
       const report = agent.getReport(thread.id, thread.classification || 'likely_scam', thread.messages);
-
       cases.push({
         id: thread.id,
         scammerName: thread.senderName,
         platform: thread.source,
         status: thread.isArchived ? 'closed' : 'active',
-
         threatLevel: thread.classification || 'likely_scam',
         iocs: report.iocs,
         transcript: thread.messages,
         timestamp: new Date(report.timestamp).toLocaleDateString(),
-        detectedLocation: thread.detectedLocation, // Map the traced location
+        detectedLocation: thread.detectedLocation,
         autoReported: thread.autoReported
       });
     });
-
     return cases;
   };
 
   const selectedThread = threads.find(t => t.id === selectedThreadId);
-
-  /* Lock Screen State */
   const [isLocked, setIsLocked] = useState(false);
 
-  if (!isAuthenticated) {
-    return <LoginScreen />;
-  }
-
-
-  if (isLocked) {
-    return <LockScreen onUnlock={() => setIsLocked(false)} />;
-  }
+  if (!isAuthenticated) return <LoginScreen />;
+  if (isLocked) return <LockScreen onUnlock={() => setIsLocked(false)} />;
 
   return (
     <>
-      {/* GLOWING NOTIFICATION OVERLAY */}
       {notification && (
         <div style={{
-          position: 'fixed',
-          top: '2rem',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 10000,
-          background: 'rgba(15, 23, 42, 0.95)',
-          border: '1px solid var(--primary)',
-          boxShadow: '0 0 20px rgba(59, 130, 246, 0.3)',
-          padding: '1rem 2rem',
-          borderRadius: '8px',
-          color: 'var(--primary)',
-          fontWeight: 'bold',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1rem',
+          position: 'fixed', top: '2rem', left: '50%', transform: 'translateX(-50%)', zIndex: 10000,
+          background: 'rgba(15, 23, 42, 0.95)', border: '1px solid var(--primary)',
+          boxShadow: '0 0 20px rgba(59, 130, 246, 0.3)', padding: '1rem 2rem', borderRadius: '8px',
+          color: 'var(--primary)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '1rem',
           animation: 'slideDown 0.3s ease-out'
         }}>
           <Shield size={20} />
@@ -492,99 +394,106 @@ function App() {
               isCompromised: t.isCompromised,
               isBlocked: t.isBlocked
             }))}
-
             selectedThreadId={selectedThreadId}
             onSelectThread={(id) => {
               if (id === 'DASHBOARD_VIEW') {
                 setSelectedThreadId(null);
+                setActiveView('DASHBOARD');
               } else {
                 setSelectedThreadId(id);
+                // When selecting a thread, we implicitly move away from dashboard/tools
+                // but we don't strictly set activeView to specific tool, just defaults back when thread cleared
               }
             }}
-            onBack={selectedThreadId ? () => setSelectedThreadId(null) : undefined}
+            onBack={() => {
+              setSelectedThreadId(null);
+              setActiveView('DASHBOARD');
+            }}
           />
 
           {/* Control Footer */}
           <div className="control-footer">
             {!isMonitoring ? (
-              <button onClick={startMonitoring} className="btn btn-primary">
-                <Play size={16} /> <span className="btn-text">INITIALIZE SYSTEM</span>
+              <button onClick={startMonitoring} className="btn btn-primary" style={{ width: '100%' }}>
+                <Play size={20} /> <span className="btn-text">INITIALIZE SYSTEM</span>
               </button>
             ) : (
-              <>
-
-                <button onClick={() => { setShowLocker(!showLocker); setShowIntelligence(false); setShowForensics(false); }} className={`nav-btn ${showLocker ? 'active' : ''}`}>
-                  <Database size={18} /> Intelligence Locker
+              <div className="control-grid">
+                <button
+                  onClick={() => { setActiveView('LOCKER'); setSelectedThreadId(null); }}
+                  className={`btn btn-icon ${activeView === 'LOCKER' && !selectedThreadId ? 'active' : ''}`}
+                  title="Intelligence Locker"
+                >
+                  <Database size={20} />
                 </button>
-                <button onClick={() => { setShowForensics(!showForensics); setShowLocker(false); setShowIntelligence(false); }} className={`nav-btn ${showForensics ? 'active' : ''}`} style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}>
-                  <ScanEye size={18} /> Forensics Lab
+                <button
+                  onClick={() => { setActiveView('FORENSICS'); setSelectedThreadId(null); }}
+                  className={`btn btn-icon ${activeView === 'FORENSICS' && !selectedThreadId ? 'active' : ''}`}
+                  title="Forensics Lab"
+                >
+                  <ScanEye size={20} />
                 </button>
-                <button onClick={() => { setShowIntelligence(!showIntelligence); setShowLocker(false); setShowForensics(false); }} className={`nav-btn ${showIntelligence ? 'active' : ''}`} style={{ borderColor: 'var(--status-info)', color: 'var(--status-info)' }}>
-                  <BarChart3 size={18} /> Monitor Intelligence
+                <button
+                  onClick={() => { setActiveView('INTELLIGENCE'); setSelectedThreadId(null); }}
+                  className={`btn btn-icon ${activeView === 'INTELLIGENCE' && !selectedThreadId ? 'active' : ''}`}
+                  title="Monitor Intelligence"
+                >
+                  <BarChart3 size={20} />
                 </button>
-              </>
+                <button
+                  onClick={() => { setActiveView('DEMO'); setSelectedThreadId(null); }}
+                  className={`btn btn-icon ${activeView === 'DEMO' && !selectedThreadId ? 'active' : ''}`}
+                  title="Test Lab (Demo Mode)"
+                >
+                  <Zap size={20} />
+                </button>
+                <button
+                  onClick={() => setIsMuted(soundManager.toggleMute())}
+                  className={`btn btn-icon ${isMuted ? 'muted' : ''}`}
+                  title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+                >
+                  {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                </button>
+                <button
+                  onClick={() => {
+                    logout();
+                    clearThreads();
+                    setSelectedThreadId(null);
+                    setIsMonitoring(false);
+                    isMonitoringRef.current = false;
+                    setActiveView('DASHBOARD');
+                  }}
+                  className="btn btn-icon btn-danger"
+                  title="Terminate Session"
+                >
+                  <LogOut size={20} />
+                </button>
+              </div>
             )}
-            <button
-              onClick={() => setIsMuted(soundManager.toggleMute())}
-              className={`btn btn-mute ${isMuted ? 'muted' : ''}`}
-            >
-              {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-              {isMuted ? 'Unmute Audio' : 'Mute Audio'}
-            </button>
-
-            <button
-              onClick={() => {
-                logout();
-                clearThreads();
-                setSelectedThreadId(null);
-                setIsMonitoring(false);
-                isMonitoringRef.current = false;
-              }}
-              className="btn btn-logout"
-              style={{ marginTop: 'auto', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}
-            >
-              <LogOut size={16} /> <span className="btn-text">TERMINATE SESSION</span>
-            </button>
           </div>
         </div>
 
-
-        {/* Main Chat */}
+        {/* Main Content Area */}
         <div className="main-chat">
-          {selectedThread ? (
+          {selectedThreadId && selectedThread ? (
             <>
-              {/* Chat Header (Truecaller Style) */}
-              <div
-                className="chat-banner"
-                data-status={
-                  selectedThread.classification === 'scam' || selectedThread.classification === 'likely_scam'
-                    ? 'scam'
-                    : selectedThread.classification === 'benign'
-                      ? 'safe'
-                      : 'neutral'
-                }
-              >
+              {/* CHAT VIEW - Takes specific logic for thread display */}
+              <div className="chat-banner" data-status={
+                selectedThread.classification === 'scam' || selectedThread.classification === 'likely_scam' ? 'scam' :
+                  selectedThread.classification === 'benign' ? 'safe' : 'neutral'
+              }>
                 <div>
                   <div className="sender-name">{selectedThread.senderName}</div>
                   <div className="sender-source">{selectedThread.source}</div>
                 </div>
-
                 <div>
                   {selectedThread.isScanning && <span className="status-scanning">Scanning...</span>}
-                  {selectedThread.classification === 'benign' && (
-                    <span className="status-safe">✓ Verified Safe</span>
-                  )}
+                  {selectedThread.classification === 'benign' && <span className="status-safe">✓ Verified Safe</span>}
                   {selectedThread.autoReported && (
                     <span className="status-reported" style={{
-                      background: 'rgba(34, 197, 94, 0.2)',
-                      color: '#4ade80',
-                      padding: '2px 8px',
-                      borderRadius: '12px',
-                      fontSize: '0.75rem',
-                      fontWeight: 'bold',
-                      border: '1px solid #22c55e',
-                      marginLeft: '10px',
-                      boxShadow: '0 0 10px rgba(34, 197, 94, 0.3)'
+                      background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80', padding: '2px 8px',
+                      borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold',
+                      border: '1px solid #22c55e', marginLeft: '10px', boxShadow: '0 0 10px rgba(34, 197, 94, 0.3)'
                     }}>
                       AUTO-REPORTED TO CYBER CELL ✅
                     </span>
@@ -592,60 +501,30 @@ function App() {
                 </div>
               </div>
 
-              {/* Compromised Contact Alert Banner */}
               {selectedThread.isCompromised && (
                 <div style={{
-                  background: 'rgba(239, 68, 68, 0.15)',
-                  borderBottom: '1px solid var(--status-danger)',
-                  padding: '0.75rem 1rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
+                  background: 'rgba(239, 68, 68, 0.15)', borderBottom: '1px solid var(--status-danger)',
+                  padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   animation: 'slideDown 0.3s ease-out'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#fca5a5' }}>
-                    <div style={{
-                      background: 'var(--status-danger)',
-                      color: 'white',
-                      padding: '4px',
-                      borderRadius: '4px'
-                    }}>
+                    <div style={{ background: 'var(--status-danger)', color: 'white', padding: '4px', borderRadius: '4px' }}>
                       <ShieldAlert size={18} />
                     </div>
                     <div>
-                      <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: 'var(--status-danger)' }}>
-                        KNOWN CONTACT COMPROMISED
-                      </div>
-                      <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>
-                        Behavior anomaly detected for {selectedThread.senderName}.
-                      </div>
+                      <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: 'var(--status-danger)' }}>KNOWN CONTACT COMPROMISED</div>
+                      <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>Behavior anomaly detected for {selectedThread.senderName}.</div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setShowLocker(true)}
-                    className="btn-danger-glow"
-                    style={{
-                      background: 'var(--status-danger)',
-                      color: 'white',
-                      border: 'none',
-                      padding: '0.4rem 0.8rem',
-                      borderRadius: '4px',
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
-                    }}
-                  >
+                  <button onClick={() => { setActiveView('LOCKER'); setSelectedThreadId(null); }} className="btn-danger-glow" style={{
+                    background: 'var(--status-danger)', color: 'white', border: 'none', padding: '0.4rem 0.8rem',
+                    borderRadius: '4px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem'
+                  }}>
                     REPORT COMPROMISE
                   </button>
                 </div>
               )}
 
-              {/* Legacy Alert Removed - Replaced by LiveIntercept */}
-
-              {/* Advanced Live Intercept Panel (Truecaller/Cyber Style) */}
               {selectedThread.isIntercepted && (
                 <LiveIntercept
                   intent={selectedThread.intent || "ANALYZING..."}
@@ -655,67 +534,75 @@ function App() {
                   counterMeasure={
                     selectedThread.intent === "MONEY" ? "TRACE_PAYMENT" :
                       selectedThread.intent === "CODES" ? "INJECT_FAKE_OTP" :
-                        selectedThread.intent === "URGENCY" ? "STALLING_PROTOCOL" :
-                          "MONITORING"
+                        selectedThread.intent === "URGENCY" ? "STALLING_PROTOCOL" : "MONITORING"
                   }
                 />
               )}
 
-              {/* Chat View */}
               <div className="chat-viewport">
                 <ChatWindow messages={selectedThread.messages} />
               </div>
             </>
           ) : (
-            <SystemDashboard
-              activeThreats={threads.filter(t => t.classification === 'scam' || t.classification === 'likely_scam').length}
-              locations={threads
-                .filter(t => (t.classification === 'scam' || t.classification === 'likely_scam') && t.detectedLocation)
-                .map(t => t.detectedLocation!)
-              }
-              onSimulateAttack={triggerBotnetMode}
-            />
+            // NOT IN CHAT - Render based on Active View
+            <>
+              {activeView === 'LOCKER' && (
+                <Suspense fallback={<div>Loading Secure Module...</div>}>
+                  <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--background-secondary)' }}>
+                      <h2 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text-primary)' }}>EVIDENCE LOCKER</h2>
+                    </div>
+                    <div style={{ flex: 1, overflow: 'hidden' }}>
+                      <EvidenceLocker cases={getCaseFiles()} onClose={() => setActiveView('DASHBOARD')} />
+                    </div>
+                  </div>
+                </Suspense>
+              )}
+
+              {activeView === 'FORENSICS' && (
+                <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--background-secondary)' }}>
+                    <h2 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text-primary)' }}>FORENSICS LAB</h2>
+                  </div>
+                  <div style={{ flex: 1, overflow: 'auto' }}>
+                    <DeepfakeAnalyzer />
+                  </div>
+                </div>
+              )}
+
+              {activeView === 'INTELLIGENCE' && (
+                <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--background-secondary)' }}>
+                    <h2 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text-primary)' }}>INTELLIGENCE MONITOR</h2>
+                  </div>
+                  <div style={{ flex: 1, overflow: 'auto', padding: '1rem' }}>
+                    <IntelligenceReport />
+                  </div>
+                </div>
+              )}
+
+              {activeView === 'DEMO' && (
+                <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--background-secondary)' }}>
+                    <h2 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text-primary)' }}>TEST LAB / DEMO</h2>
+                  </div>
+                  <div style={{ flex: 1, overflow: 'auto' }}>
+                    <DemoConsole />
+                  </div>
+                </div>
+              )}
+
+              {activeView === 'DASHBOARD' && (
+                <SystemDashboard
+                  activeThreats={threads.filter(t => t.classification === 'scam' || t.classification === 'likely_scam').length}
+                  locations={threads.filter(t => (t.classification === 'scam' || t.classification === 'likely_scam') && t.detectedLocation).map(t => t.detectedLocation!)}
+                  onSimulateAttack={triggerBotnetMode}
+                />
+              )}
+            </>
           )}
         </div>
-      </div >
-
-      {
-        showLocker && (
-          <Suspense fallback={<div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.8)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading Secure Module...</div>}>
-            <EvidenceLocker cases={getCaseFiles()} onClose={() => setShowLocker(false)} />
-          </Suspense>
-        )
-      }
-      {
-        showIntelligence && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(15, 23, 42, 0.95)', overflowY: 'auto' }}>
-            <div style={{ maxWidth: '1000px', margin: '2rem auto', background: '#1e293b', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
-              <button
-                onClick={() => setShowIntelligence(false)}
-                style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.5rem' }}
-              >
-                ×
-              </button>
-              <IntelligenceReport />
-            </div>
-          </div>
-        )
-      }
-      {
-        showForensics && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.98)', overflowY: 'auto' }}>
-            <div style={{ maxWidth: '1200px', margin: '2rem auto', background: '#0f172a', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', position: 'relative', minHeight: '80vh', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
-              <button
-                onClick={() => setShowForensics(false)}
-                style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'rgba(255,255,255,0.05)', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.5rem', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}
-              >
-                ×
-              </button>
-              <DeepfakeAnalyzer />
-            </div>
-          </div>
-        )
-      }
+      </div>
     </>
   );
 }

@@ -84,6 +84,14 @@ export class HoneypotAgent {
             this.maxThreatLevel = 'scam';
         }
 
+        // 7. Heuristic Score Override
+        // If the AI analyzer detects high threat but keywords missed it, upgrade classification
+        if (score >= 0.85 && this.maxThreatLevel !== 'scam') {
+            this.maxThreatLevel = 'scam';
+        } else if (score >= 0.6 && this.maxThreatLevel === 'benign') {
+            this.maxThreatLevel = 'likely_scam';
+        }
+
         if (this.maxThreatLevel === 'scam' && !this.hasAutoReported) {
             this.hasAutoReported = true;
             const report = this.getReport(conversationId, this.maxThreatLevel, [...this.conversationHistory]);
@@ -181,7 +189,10 @@ export class HoneypotAgent {
             "verify", "wallet", "private key", "bank", "earn", "compromised",
             "limited", "proposal", "transfer", "urgent", "click", "upi",
             "warrant", "arrest", "irs", "tax", "federal", "jail", // IRS/Authority
-            "virus", "infected", "microsoft", "support", "hacked", "illegal" // Tech Support
+            "virus", "infected", "microsoft", "support", "hacked", "illegal", // Tech Support
+            "prize", "winner", "won", "lottery", "claim", "reward", // Lottery
+            "otp", "code", "pin", "password", "login", "account", // Phishing
+            "btc", "eth", "crypto", "invest", "profit", "return" // Crypto
         ];
 
         if (scamKeywords.some(kw => lower.includes(kw))) return 'scam';
