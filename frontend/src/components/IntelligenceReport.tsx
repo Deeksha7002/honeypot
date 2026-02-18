@@ -8,7 +8,12 @@ export const IntelligenceReport: React.FC = () => {
     const [summary, setSummary] = useState<IntelligenceSummary | null>(null);
 
     useEffect(() => {
-        refreshData();
+        IntelligenceService.syncWithBackend().then(refreshData);
+        // Refresh every 30s to keep dashboard alive
+        const interval = setInterval(() => {
+            IntelligenceService.syncWithBackend().then(refreshData);
+        }, 30000);
+        return () => clearInterval(interval);
     }, [range]);
 
     const refreshData = () => {

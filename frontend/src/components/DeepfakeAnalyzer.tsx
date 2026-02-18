@@ -85,7 +85,7 @@ export const DeepfakeAnalyzer: React.FC = () => {
     const StatusBadge = ({ score }: { score: number }) => {
         const color = score > 80 ? '#10b981' : score > 50 ? '#f59e0b' : '#ef4444';
         return (
-            <div style={{ background: `${color}20`, color: color, padding: '4px 12px', borderRadius: '4px', fontSize: '0.8rem', border: `1px solid ${color}40`, fontWeight: 'bold' }}>
+            <div style={{ background: `${color}20`, color: color, padding: '6px 14px', borderRadius: '4px', fontSize: '0.9rem', border: `1px solid ${color}40`, fontWeight: 'bold' }}>
                 AUTHENTICITY: {score}%
             </div>
         );
@@ -205,15 +205,15 @@ export const DeepfakeAnalyzer: React.FC = () => {
 
                         {result && (
                             <div className="sys-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
                                     <div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
                                             <h2 style={{ fontSize: '1.2rem', margin: 0, fontWeight: 'bold' }}>FORENSIC ANALYSIS REPORT</h2>
                                             <StatusBadge score={result.authenticityScore} />
                                         </div>
                                         <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>ID: FX-{result.timestamp.toString().slice(-8)} | CONFIDENCE: {result.confidenceLevel.toUpperCase()}</p>
                                     </div>
-                                    <div style={{ textAlign: 'right' }}>
+                                    <div style={{ textAlign: 'right', minWidth: '150px' }}>
                                         <p style={{ fontSize: '0.7rem', color: '#64748b', margin: '0 0 4px 0' }}>RECOMMENDATION</p>
                                         <span style={{
                                             color: result.recommendation.includes('Authentic') ? '#10b981' : '#ef4444',
@@ -229,20 +229,20 @@ export const DeepfakeAnalyzer: React.FC = () => {
                                 {/* GENERALIZATION & ANOMALY METERS */}
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                     <div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                            <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>GENERALIZATION CONFIDENCE</span>
-                                            <span style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 'bold' }}>{Math.round(result.generalizationConfidence || 85)}%</span>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                            <span style={{ fontSize: '0.7rem', color: '#cbd5e1', fontWeight: 600 }}>GENERALIZATION CONFIDENCE</span>
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 'bold' }}>{Math.round(result.generalizationConfidence || 85)}%</span>
                                         </div>
-                                        <div style={{ height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+                                        <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
                                             <div style={{ width: `${result.generalizationConfidence || 85}%`, height: '100%', background: 'var(--primary)', transition: 'width 1s ease-out' }} />
                                         </div>
                                     </div>
                                     <div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                            <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>ANOMALY RADAR SCORE</span>
-                                            <span style={{ fontSize: '0.7rem', color: (result.anomalyScore || 0) > 60 ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>{Math.round(result.anomalyScore || 10)}%</span>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                            <span style={{ fontSize: '0.7rem', color: '#cbd5e1', fontWeight: 600 }}>ANOMALY RADAR SCORE</span>
+                                            <span style={{ fontSize: '0.8rem', color: (result.anomalyScore || 0) > 60 ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>{Math.round(result.anomalyScore || 10)}%</span>
                                         </div>
-                                        <div style={{ height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+                                        <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
                                             <div style={{ width: `${result.anomalyScore || 10}%`, height: '100%', background: (result.anomalyScore || 0) > 60 ? '#ef4444' : '#10b981', transition: 'width 1s ease-out' }} />
                                         </div>
                                     </div>
@@ -259,7 +259,7 @@ export const DeepfakeAnalyzer: React.FC = () => {
                                 )}
 
                                 {/* HEURISTIC ANOMALY HEATMAP SIMULATION */}
-                                <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '2rem', padding: '1.5rem', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', padding: '1.5rem', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                     <div style={{ position: 'relative', width: '300px', height: '180px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
                                         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '6px 10px', background: 'rgba(0,0,0,0.5)', fontSize: '0.65rem', color: 'var(--primary)', fontWeight: 'bold', zIndex: 10 }}>ANOMALY HEATMAP GRID</div>
                                         {/* Simulated Heatmap Pixels */}
@@ -277,18 +277,18 @@ export const DeepfakeAnalyzer: React.FC = () => {
                                                 );
                                             })}
                                         </div>
-                                        <div style={{ position: 'absolute', bottom: '10px', left: '10px', fontSize: '0.6rem', color: '#94a3b8' }}>SCANNER RESOLUTION: 8-BIT NEURAL</div>
+                                        <div style={{ position: 'absolute', bottom: '10px', left: '10px', fontSize: '0.65rem', color: '#94a3b8' }}>SCANNER RESOLUTION: 8-BIT NEURAL</div>
                                     </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', justifyContent: 'center' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', justifyContent: 'center', flex: 1, minWidth: '250px' }}>
                                         <h4 style={{ margin: 0, fontSize: '0.8rem', color: 'var(--primary)', letterSpacing: '1px' }}>NEURAL CONSENSUS AUDIT</h4>
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                             {['OPTICAL', 'STRUCTURAL', 'FIDELITY', 'SEMANTIC', 'METADATA', 'ENVIRONMENTAL'].map((label) => (
                                                 <div key={label}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#94a3b8', marginBottom: '4px' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#cbd5e1', marginBottom: '6px', fontWeight: 600 }}>
                                                         <span>{label}</span>
-                                                        <span style={{ color: (result.authenticityScore < 90) ? '#ef4444' : '#10b981' }}>{Math.round(result.authenticityScore)}%</span>
+                                                        <span style={{ color: (result.authenticityScore < 90) ? '#ef4444' : '#10b981', fontSize: '0.75rem' }}>{Math.round(result.authenticityScore)}%</span>
                                                     </div>
-                                                    <div style={{ height: '2px', background: 'rgba(255,255,255,0.05)', borderRadius: '1px' }}>
+                                                    <div style={{ height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px' }}>
                                                         <div style={{ height: '100%', width: `${result.authenticityScore}%`, background: (result.authenticityScore < 90) ? '#ef4444' : '#10b981' }} />
                                                     </div>
                                                 </div>

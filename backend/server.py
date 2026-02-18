@@ -3,6 +3,8 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import logging
 import time
+import json
+import os
 from fastapi.middleware.cors import CORSMiddleware
 from analyzer import ScamAnalyzer
 from agent import HoneypotAgent
@@ -27,7 +29,7 @@ agent = HoneypotAgent()
 
 # --- Data Models ---
 class AnalysisRequest(BaseModel):
-    text: string
+    text: str
     context: Optional[str] = "general"
 
 class ReportRequest(BaseModel):
@@ -64,6 +66,29 @@ def analyze_text(request: AnalysisRequest):
         "verified": True
     }
 
+# --- Stats Persistence ---
+STATS_FILE = "stats.json"
+
+def load_stats():
+    try:
+        if os.path.exists(STATS_FILE):
+            with open(STATS_FILE, "r") as f:
+                return json.load(f)
+    except Exception as e:
+        logging.error(f"Failed to load stats: {e}")
+    return {"scams_detected": 0, "reports_filed": 0, "types": {}}
+
+def save_stats(stats):
+    try:
+        with open(STATS_FILE, "w") as f:
+            json.dump(stats, f)
+    except Exception as e:
+        logging.error(f"Failed to save stats: {e}")
+
+@app.get("/api/stats")
+def get_stats():
+    return load_stats()
+
 @app.post("/api/report")
 def submit_report(report: ReportRequest):
     """
@@ -71,13 +96,15 @@ def submit_report(report: ReportRequest):
     """
     logging.info(f"🚨 [REPORT RECEIVED] ID: {report.conversationId} | Type: {report.classification}")
     
-    # Log IOCs
-    iocs = report.iocs
-    if iocs:
-        logging.info(f"   🔍 URLs: {len(iocs.get('urls', []))}")
-        logging.info(f"   🔍 Wallets: {len(iocs.get('paymentMethods', []))}")
-
-    # In a real app, save to database here
+    # Update Persisted Stats
+    stats = load_stats()
+    stats["reports_filed"] += 1
+    
+    # Update type breakdown
+    scam_type = report.classification.upper()
+    stats["types"][scam_type] = stats["types"].get(scam_type, 0) + 1
+    
+    save_stats(stats)
     
     return {"status": "received", "case_id": f"CASE-{int(time.time())}"}
 
