@@ -70,7 +70,8 @@ def analyze_text(request: AnalysisRequest):
     }
 
 # --- Stats Persistence ---
-STATS_FILE = "stats.json"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATS_FILE = os.path.join(BASE_DIR, "stats.json")
 
 def load_stats():
     try:
@@ -95,7 +96,7 @@ def get_stats():
 
 
 # --- Cases Persistence ---
-CASES_FILE = "cases.json"
+CASES_FILE = os.path.join(BASE_DIR, "cases.json")
 
 def load_cases():
     try:
@@ -154,7 +155,7 @@ def submit_report(report: ReportRequest):
     return {"status": "received", "case_id": f"CASE-{int(time.time())}"}
 
 # --- Auth Persistence ---
-USERS_FILE = "users.json"
+USERS_FILE = os.path.join(BASE_DIR, "users.json")
 
 def load_users():
     try:
