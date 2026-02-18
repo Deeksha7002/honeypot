@@ -25,3 +25,7 @@ web-app/*.log
 Thumbs.db
 *.swp
 *.swo
+
+# Backend Data
+backend/stats.json
+backend/cases.json

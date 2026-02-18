@@ -12,20 +12,20 @@ export class CyberCellService {
         console.log(`%c[CyberCellService] Auto-Reporting Incident: ${report.conversationId}`, 'color: #ef4444; font-weight: bold;');
 
         try {
-            // 1. Prepare JSON Evidence Data
+            // 1. Prepare JSON Evidence Data (Matches server.py ReportRequest)
             const evidenceJson = {
-                metadata: {
-                    id: report.conversationId,
-                    timestamp: report.timestamp,
-                    threatLevel: report.classification,
-                    confidenceScore: report.confidenceScore
-                },
+                conversationId: report.conversationId,
+                scammerName: report.scammerName || "Unknown",
+                platform: report.platform || "chat",
+                classification: report.classification,
+                confidenceScore: report.confidenceScore,
                 iocs: report.iocs,
                 transcript: report.transcript.map(m => ({
                     role: m.sender,
                     content: m.content,
                     time: new Date(m.timestamp).toISOString()
-                }))
+                })),
+                timestamp: report.timestamp
             };
 
             console.log('[CyberCellService] Generated JSON Payload:', evidenceJson);
@@ -33,8 +33,8 @@ export class CyberCellService {
             // 2. Generate PDF Evidence
             const caseShim: CaseFile = {
                 id: report.conversationId,
-                scammerName: "Identified Threat",
-                platform: report.transcript[0]?.source || 'chat',
+                scammerName: report.scammerName || "Identified Threat",
+                platform: report.platform || "chat",
                 status: 'closed',
                 threatLevel: report.classification,
                 iocs: report.iocs,
@@ -74,6 +74,23 @@ export class CyberCellService {
             console.error('[CyberCellService] ❌ Failed to auto-report:', error);
             return false;
         }
+    }
+
+    /**
+     * Fetches persistent cases from the backend.
+     */
+    static async getAllCases(): Promise<CaseFile[]> {
+        try {
+            const res = await fetch('http://localhost:8000/api/cases');
+            if (res.ok) {
+                const cases = await res.json();
+                console.log('[CyberCellService] 📂 Loaded persistent cases:', cases.length);
+                return cases;
+            }
+        } catch (e) {
+            console.warn('[CyberCellService] ⚠️ Failed to fetch cases from backend.');
+        }
+        return [];
     }
 
     /**

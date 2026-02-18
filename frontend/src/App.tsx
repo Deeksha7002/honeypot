@@ -35,7 +35,14 @@ function App() {
   const [activeView, setActiveView] = useState<ViewState>('DASHBOARD');
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+
   const [notification, setNotification] = useState<string | null>(null);
+  const [persistentCases, setPersistentCases] = useState<CaseFile[]>([]);
+
+  useEffect(() => {
+    // Load persistent cases on boot
+    CyberCellService.getAllCases().then(cases => setPersistentCases(cases));
+  }, []);
 
   useEffect(() => {
     if (notification) {
@@ -193,6 +200,8 @@ function App() {
 
             CyberCellService.autoReport({
               conversationId: threadId,
+              scammerName: senderName || 'Unknown',
+              platform: 'chat',
               classification: 'scam',
               timestamp: new Date().toISOString(),
               confidenceScore: result.authenticityScore,
@@ -203,6 +212,9 @@ function App() {
                 paymentMethods: [],
                 sensitiveDataRedacted: 0
               }
+            }).then(() => {
+              // Refresh persistent cases after report
+              CyberCellService.getAllCases().then(setPersistentCases);
             });
 
             console.warn(`%c[Shredder] ☢️ AUTOMATED DESTRUCTION COMPLETE`, 'color: #ef4444; font-weight: bold;');
@@ -334,8 +346,14 @@ function App() {
   };
 
   const getCaseFiles = (): CaseFile[] => {
-    const cases: CaseFile[] = [];
+    // Start with persistent cases from backend
+    const cases: CaseFile[] = [...persistentCases];
+
+    // Add live threads that aren't yet persisted
     threads.forEach((thread: Thread) => {
+      // Skip if already in persistent list
+      if (cases.some(c => c.id === thread.id)) return;
+
       if (!thread.classification && !thread.isIntercepted) return;
       if (thread.classification === 'benign') return;
       const agent = agentsRef.current.get(thread.id);
@@ -356,6 +374,7 @@ function App() {
     });
     return cases;
   };
+
 
   const selectedThread = threads.find(t => t.id === selectedThreadId);
   const [isLocked, setIsLocked] = useState(false);

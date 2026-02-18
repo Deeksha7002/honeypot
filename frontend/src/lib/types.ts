@@ -59,6 +59,8 @@ export interface GeoLocation {
 
 export interface IncidentReport {
     conversationId: string;
+    scammerName?: string;
+    platform?: string;
     classification: Classification;
     confidenceScore: number; // 0-1
     iocs: IOCs;

@@ -34,6 +34,8 @@ class AnalysisRequest(BaseModel):
 
 class ReportRequest(BaseModel):
     conversationId: str
+    scammerName: Optional[str] = "Unknown"
+    platform: Optional[str] = "chat"
     classification: str
     confidenceScore: float
     transcript: List[Dict[str, Any]]
@@ -89,6 +91,31 @@ def save_stats(stats):
 def get_stats():
     return load_stats()
 
+
+
+# --- Cases Persistence ---
+CASES_FILE = "cases.json"
+
+def load_cases():
+    try:
+        if os.path.exists(CASES_FILE):
+            with open(CASES_FILE, "r") as f:
+                return json.load(f)
+    except Exception as e:
+        logging.error(f"Failed to load cases: {e}")
+    return []
+
+def save_cases(cases):
+    try:
+        with open(CASES_FILE, "w") as f:
+            json.dump(cases, f)
+    except Exception as e:
+        logging.error(f"Failed to save cases: {e}")
+
+@app.get("/api/cases")
+def get_cases():
+    return load_cases()
+
 @app.post("/api/report")
 def submit_report(report: ReportRequest):
     """
@@ -100,11 +127,28 @@ def submit_report(report: ReportRequest):
     stats = load_stats()
     stats["reports_filed"] += 1
     
-    # Update type breakdown
     scam_type = report.classification.upper()
     stats["types"][scam_type] = stats["types"].get(scam_type, 0) + 1
     
     save_stats(stats)
+
+    # Save Case File
+    cases = load_cases()
+    # Avoid duplicates
+    if not any(c['id'] == report.conversationId for c in cases):
+        new_case = {
+            "id": report.conversationId,
+            "scammerName": report.scammerName,
+            "platform": report.platform,
+            "status": "closed",
+            "threatLevel": report.classification,
+            "iocs": report.iocs,
+            "transcript": report.transcript,
+            "timestamp": report.timestamp,
+            "autoReported": True
+        }
+        cases.append(new_case)
+        save_cases(cases)
     
     return {"status": "received", "case_id": f"CASE-{int(time.time())}"}
 
