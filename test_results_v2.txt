@@ -1,0 +1,45 @@
+Input: 'My horse is sick, send vet fee immediately via card.'
+  -> Intent: HIGH_RISK_BEHAVIOR
+  -> Score: 0.95
+  -> Classification: scam
+------------------------------
+Input: 'I am from the court. You have a lawsuit. Pay the fine.'
+  -> Intent: AUTHORITY_IMPERSONATION
+  -> Score: 0.95
+  -> Classification: scam
+------------------------------
+Input: 'Can you help me with my project today?'
+  -> Intent: GENERAL_INQUIRY
+  -> Score: 0.5
+  -> Classification: benign
+------------------------------
+Input: 'My horse is sick, send vet fee immediately via card.'
+  -> Intent: HIGH_RISK_BEHAVIOR
+  -> Score: 0.95
+  -> Classification: scam
+------------------------------
+Input: 'I am from the court. You have a lawsuit. Pay the fine.'
+  -> Intent: AUTHORITY_IMPERSONATION
+  -> Score: 0.95
+  -> Classification: scam
+------------------------------
+Input: 'Can you help me with my project today?'
+  -> Intent: GENERAL_INQUIRY
+  -> Score: 0.5
+  -> Classification: benign
+------------------------------
+Input: 'My horse is sick, send vet fee immediately via card.'
+  -> Intent: HIGH_RISK_BEHAVIOR
+  -> Score: 0.95
+  -> Classification: scam
+------------------------------
+Input: 'I am from the court. You have a lawsuit. Pay the fine.'
+  -> Intent: AUTHORITY_IMPERSONATION
+  -> Score: 0.95
+  -> Classification: scam
+------------------------------
+Input: 'Can you help me with my project today?'
+  -> Intent: GENERAL_INQUIRY
+  -> Score: 0.5
+  -> Classification: benign
+------------------------------

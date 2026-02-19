@@ -38,9 +38,9 @@ export class IntelligenceService {
         const backendTypes = this.backendStats?.types || {};
 
         const summary: IntelligenceSummary = {
-            today: localTodays, // "Today" is tricky to persist without dates, keeping local for now
-            week: backendTotal, // Simplified: treating total as "week" for demo
-            month: backendTotal,
+            today: this.backendStats?.today || localTodays,
+            week: this.backendStats?.week || backendTotal,
+            month: this.backendStats?.month || backendTotal,
             byType: {
                 ROMANCE: (backendTypes['ROMANCE'] || 0),
                 CRYPTO: (backendTypes['CRYPTO'] || 0),
@@ -49,7 +49,7 @@ export class IntelligenceService {
                 LOTTERY: (backendTypes['LOTTERY'] || 0),
                 TECHNICAL_SUPPORT: (backendTypes['TECHNICAL_SUPPORT'] || 0),
                 AUTHORITY: (backendTypes['AUTHORITY'] || 0),
-                OTHER: (backendTypes['OTHER'] || 0)
+                OTHER: (backendTypes['OTHER'] || backendTypes['SCAM'] || 0) // Fold generic SCAM into OTHER
             },
             uniqueScammers: new Set(this.records.map(r => r.senderName)).size + Math.floor(backendTotal * 0.8),
             repeatedIdentifiers: this.getRepeatedIdentifiers()

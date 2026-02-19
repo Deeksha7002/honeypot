@@ -14,7 +14,7 @@ export interface Message {
     }[];
 }
 
-export type Classification = 'scam' | 'likely_scam' | 'benign';
+export type Classification = 'scam' | 'likely_scam' | 'benign' | ScamType;
 
 export interface Scenario {
     id: string;

@@ -339,7 +339,7 @@ export class HoneypotAgent {
     getReport(conversationId: string, _classification: Classification, transcript: Message[]): IncidentReport {
         return {
             conversationId,
-            classification: this.maxThreatLevel,
+            classification: this.currentScamType !== 'OTHER' ? this.currentScamType : this.maxThreatLevel,
             confidenceScore: this.maxThreatLevel === 'scam' ? 0.95 : this.maxThreatLevel === 'likely_scam' ? 0.75 : 0.1,
             iocs: { ...this.iocs },
             transcript,

@@ -6,4 +6,8 @@ python-dotenv==1.0.1
 fastapi
 uvicorn
 pydantic
+python-jose[cryptography]
+passlib[bcrypt]
+sqlalchemy
+bcrypt
 

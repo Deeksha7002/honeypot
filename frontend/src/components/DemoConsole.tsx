@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { HoneypotAgent } from '../lib/HoneypotAgent';
+
 import { Shield, ShieldAlert, CheckCircle, AlertTriangle, Play, RefreshCw, Terminal, Search, Zap } from 'lucide-react';
 
 export const DemoConsole: React.FC = () => {
@@ -12,16 +12,25 @@ export const DemoConsole: React.FC = () => {
         setAnalyzing(true);
         setResult(null);
 
-        // Simulate processing time for realism
-        await new Promise(r => setTimeout(r, 1200));
+        try {
+            const res = await fetch('http://localhost:8000/api/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: input })
+            });
 
-        const agent = new HoneypotAgent();
-        // We use a dummy ID and context
-        const analysis = agent.ingest(input, 'demo-session');
-
-        console.log("Demo Analysis:", analysis);
-        setResult(analysis);
-        setAnalyzing(false);
+            if (res.ok) {
+                const data = await res.json();
+                console.log("Backend Analysis:", data);
+                setResult(data);
+            } else {
+                console.error("Analysis failed");
+            }
+        } catch (e) {
+            console.error("Connection error", e);
+        } finally {
+            setAnalyzing(false);
+        }
     };
 
     const handleReset = () => {
@@ -150,16 +159,13 @@ export const DemoConsole: React.FC = () => {
                                             result.classification === 'likely_scam' ? '#f59e0b' : '#10b981'
                                     }}>
                                         {result.classification === 'scam' ? 'MALICIOUS THREAT DETECTED' :
-                                            result.classification === 'likely_scam' ? 'SUSPICIOUS ACTIVITY' : 'SAFE / BENIGN'}
+                                            result.classification === 'likely_scam' ? 'SUSPICIOUS ACTIVITY' : 'SAFE'}
                                     </div>
                                 </div>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px' }}>
-                                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.5rem' }}>THREAT SCORE</div>
-                                    <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#fff' }}>{result.score}/100</div>
-                                </div>
+
                                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px' }}>
                                     <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.5rem' }}>DETECTED INTENT</div>
                                     <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#fff' }}>{result.intent}</div>
