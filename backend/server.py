@@ -218,11 +218,11 @@ def login(creds: LoginRequest, db: Session = Depends(get_db)):
 
 @app.post("/api/register")
 def register(creds: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == creds.username).first()
+    if user:
+        raise HTTPException(status_code=400, detail="Operator ID already exists")
+    
     try:
-        user = db.query(User).filter(User.username == creds.username).first()
-        if user:
-            raise HTTPException(status_code=400, detail="Operator ID already exists")
-        
         hashed_pw = security.get_password_hash(creds.password)
         new_user = User(username=creds.username, hashed_password=hashed_pw, role="operator")
         db.add(new_user)
@@ -233,6 +233,269 @@ def register(creds: LoginRequest, db: Session = Depends(get_db)):
     except Exception as e:
         logging.error(f"Registration Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- Biometric Auth (WebAuthn) ---
+from webauthn import (
+    generate_registration_options,
+    verify_registration_response,
+    generate_authentication_options,
+    verify_authentication_response,
+)
+from webauthn.helpers import bytes_to_base64url, base64url_to_bytes, options_to_json
+from webauthn.helpers.structs import (
+    AttestationConveyancePreference,
+    AuthenticatorSelectionCriteria,
+    AuthenticatorAttachment,
+    UserVerificationRequirement,
+    ResidentKeyRequirement,
+    RegistrationCredential,
+    AuthenticationCredential,
+    AuthenticatorAttestationResponse,
+    AuthenticatorAssertionResponse,
+)
+
+RP_ID = "localhost"
+RP_NAME = "Scam Defender"
+ORIGIN = "http://localhost:5173"
+
+# In-memory store for challenges (In prod use Redis)
+challenges = {} 
+
+@app.post("/api/auth/biometric/register/start")
+def register_bio_start(username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    options = generate_registration_options(
+        rp_id=RP_ID,
+        rp_name=RP_NAME,
+        user_id=str(user.id).encode(),
+        user_name=user.username,
+        user_display_name=user.username,
+        authenticator_selection=AuthenticatorSelectionCriteria(
+            authenticator_attachment=AuthenticatorAttachment.PLATFORM,
+            user_verification=UserVerificationRequirement.PREFERRED,
+            resident_key=ResidentKeyRequirement.PREFERRED,
+        ),
+        attestation=AttestationConveyancePreference.NONE,
+    )
+
+    challenges[user.username] = options.challenge
+    return json.loads(options_to_json(options))
+
+@app.post("/api/auth/biometric/register/finish")
+def register_bio_finish(response: Dict[str, Any], username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    challenge = challenges.get(user.username)
+    if not challenge:
+        raise HTTPException(status_code=400, detail="No active registration challenge found")
+
+    try:
+        att_response = response.get("response", {})
+        credential = RegistrationCredential(
+            id=response["id"],
+            raw_id=base64url_to_bytes(response["rawId"]),
+            response=AuthenticatorAttestationResponse(
+                client_data_json=base64url_to_bytes(att_response["clientDataJSON"]),
+                attestation_object=base64url_to_bytes(att_response["attestationObject"]),
+            ),
+            type=response.get("type", "public-key"),
+        )
+
+        verification = verify_registration_response(
+            credential=credential,
+            expected_challenge=challenge,
+            expected_origin=ORIGIN,
+            expected_rp_id=RP_ID,
+            require_user_verification=False,
+        )
+
+        new_cred = {
+            "credential_id": bytes_to_base64url(verification.credential_id),
+            "credential_public_key": bytes_to_base64url(verification.credential_public_key),
+            "sign_count": verification.sign_count,
+        }
+
+        creds = list(user.webauthn_credentials) if user.webauthn_credentials else []
+        creds.append(new_cred)
+        user.webauthn_credentials = creds
+        db.commit()
+        challenges.pop(user.username, None)
+        return {"status": "registered"}
+
+    except Exception as e:
+        logging.error(f"Biometric registration failed: {e}")
+        raise HTTPException(status_code=400, detail=f"Registration failed: {str(e)}")
+
+@app.post("/api/auth/biometric/login/start")
+def login_bio_start(username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not user.webauthn_credentials:
+        raise HTTPException(status_code=400, detail="No biometric registered for this account")
+
+    from webauthn.helpers.structs import PublicKeyCredentialDescriptor
+    allow_credentials = []
+    for cred in (user.webauthn_credentials or []):
+        try:
+            allow_credentials.append(
+                PublicKeyCredentialDescriptor(id=base64url_to_bytes(cred["credential_id"]))
+            )
+        except Exception:
+            pass
+
+    options = generate_authentication_options(
+        rp_id=RP_ID,
+        allow_credentials=allow_credentials,
+        user_verification=UserVerificationRequirement.PREFERRED,
+    )
+
+    challenges["LOGIN_" + username] = options.challenge
+    return json.loads(options_to_json(options))
+
+@app.post("/api/auth/biometric/login/finish")
+def login_bio_finish(response: Dict[str, Any], username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    challenge = challenges.get("LOGIN_" + username)
+    if not challenge:
+        raise HTTPException(status_code=400, detail="No active login challenge found")
+
+    cred_id = response.get("id")
+    matched_cred = None
+    for c in (user.webauthn_credentials or []):
+        if c.get("credential_id") == cred_id:
+            matched_cred = c
+            break
+
+    if not matched_cred:
+        raise HTTPException(status_code=400, detail="Credential not registered on this account")
+
+    try:
+        ass_response = response.get("response", {})
+        credential = AuthenticationCredential(
+            id=response["id"],
+            raw_id=base64url_to_bytes(response["rawId"]),
+            response=AuthenticatorAssertionResponse(
+                client_data_json=base64url_to_bytes(ass_response["clientDataJSON"]),
+                authenticator_data=base64url_to_bytes(ass_response["authenticatorData"]),
+                signature=base64url_to_bytes(ass_response["signature"]),
+                user_handle=base64url_to_bytes(ass_response["userHandle"]) if ass_response.get("userHandle") else None,
+            ),
+            type=response.get("type", "public-key"),
+        )
+
+        verification = verify_authentication_response(
+            credential=credential,
+            expected_challenge=challenge,
+            expected_origin=ORIGIN,
+            expected_rp_id=RP_ID,
+            credential_public_key=base64url_to_bytes(matched_cred["credential_public_key"]),
+            credential_current_sign_count=matched_cred["sign_count"],
+            require_user_verification=False,
+        )
+
+        matched_cred["sign_count"] = verification.new_sign_count
+        user.webauthn_credentials = list(user.webauthn_credentials)
+        db.commit()
+        challenges.pop("LOGIN_" + username, None)
+
+        access_token = security.create_access_token(data={"sub": user.username, "role": user.role})
+        return {"status": "success", "token": access_token}
+
+    except Exception as e:
+        logging.error(f"Biometric login failed: {e}")
+        raise HTTPException(status_code=400, detail=f"Biometric auth failed: {str(e)}")
+
+# --- Discoverable / Username-less Biometric Login (auto-prompt on page load) ---
+DISCOVER_CHALLENGE_KEY = "__DISCOVER__"
+
+@app.post("/api/auth/biometric/discover/start")
+def discover_bio_start():
+    """Generate a challenge with no allow_credentials — browser will offer all saved passkeys."""
+    options = generate_authentication_options(
+        rp_id=RP_ID,
+        allow_credentials=[],   # empty = discoverable / resident key
+        user_verification=UserVerificationRequirement.PREFERRED,
+    )
+    challenges[DISCOVER_CHALLENGE_KEY] = options.challenge
+    return json.loads(options_to_json(options))
+
+@app.post("/api/auth/biometric/discover/finish")
+def discover_bio_finish(response: Dict[str, Any], db: Session = Depends(get_db)):
+    """Verify the assertion and identify the user via userHandle."""
+    challenge = challenges.get(DISCOVER_CHALLENGE_KEY)
+    if not challenge:
+        raise HTTPException(status_code=400, detail="No active discovery challenge")
+
+    # Decode userHandle to get user ID
+    user_handle_b64 = response.get("response", {}).get("userHandle")
+    if not user_handle_b64:
+        raise HTTPException(status_code=400, detail="No userHandle in assertion — use normal login")
+
+    try:
+        user_id_bytes = base64url_to_bytes(user_handle_b64)
+        user_id = int(user_id_bytes.decode())
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid userHandle")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found from userHandle")
+
+    cred_id = response.get("id")
+    matched_cred = None
+    for c in (user.webauthn_credentials or []):
+        if c.get("credential_id") == cred_id:
+            matched_cred = c
+            break
+
+    if not matched_cred:
+        raise HTTPException(status_code=400, detail="Credential not registered on this account")
+
+    try:
+        ass_response = response.get("response", {})
+        credential = AuthenticationCredential(
+            id=response["id"],
+            raw_id=base64url_to_bytes(response["rawId"]),
+            response=AuthenticatorAssertionResponse(
+                client_data_json=base64url_to_bytes(ass_response["clientDataJSON"]),
+                authenticator_data=base64url_to_bytes(ass_response["authenticatorData"]),
+                signature=base64url_to_bytes(ass_response["signature"]),
+                user_handle=base64url_to_bytes(ass_response["userHandle"]) if ass_response.get("userHandle") else None,
+            ),
+            type=response.get("type", "public-key"),
+        )
+
+        verification = verify_authentication_response(
+            credential=credential,
+            expected_challenge=challenge,
+            expected_origin=ORIGIN,
+            expected_rp_id=RP_ID,
+            credential_public_key=base64url_to_bytes(matched_cred["credential_public_key"]),
+            credential_current_sign_count=matched_cred["sign_count"],
+            require_user_verification=False,
+        )
+
+        matched_cred["sign_count"] = verification.new_sign_count
+        user.webauthn_credentials = list(user.webauthn_credentials)
+        db.commit()
+        challenges.pop(DISCOVER_CHALLENGE_KEY, None)
+
+        access_token = security.create_access_token(data={"sub": user.username, "role": user.role})
+        return {"status": "success", "token": access_token, "username": user.username}
+
+    except Exception as e:
+        logging.error(f"Discoverable biometric login failed: {e}")
+        raise HTTPException(status_code=400, detail=f"Biometric auth failed: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

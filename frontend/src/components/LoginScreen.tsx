@@ -1,10 +1,91 @@
-import React, { useState } from 'react';
-import { ShieldCheck, Fingerprint, Lock, ChevronRight, Eye, EyeOff, UserPlus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShieldCheck, Lock, Fingerprint, EyeOff, Eye, AlertTriangle, ScanFace, UserPlus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import '../index.css';
 
 interface LoginScreenProps {
     onLogin?: (username: string) => void;
+}
+
+// ── WebAuthn base64url helpers ──────────────────────────────────────────────
+function base64urlToBuffer(base64url: string): ArrayBuffer {
+    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+    const binary = atob(padded);
+    const buffer = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) buffer[i] = binary.charCodeAt(i);
+    return buffer.buffer;
+}
+
+function bufferToBase64url(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+// Converts challenge/id fields in options from base64url strings → ArrayBuffers
+function prepareRegistrationOptions(options: any): PublicKeyCredentialCreationOptions {
+    return {
+        ...options,
+        challenge: base64urlToBuffer(options.challenge),
+        user: {
+            ...options.user,
+            id: base64urlToBuffer(options.user.id),
+        },
+        excludeCredentials: (options.excludeCredentials || []).map((c: any) => ({
+            ...c,
+            id: base64urlToBuffer(c.id),
+        })),
+    };
+}
+
+function prepareAuthenticationOptions(options: any): PublicKeyCredentialRequestOptions {
+    return {
+        ...options,
+        challenge: base64urlToBuffer(options.challenge),
+        allowCredentials: (options.allowCredentials || []).map((c: any) => ({
+            ...c,
+            id: base64urlToBuffer(c.id),
+        })),
+    };
+}
+
+// ── Enroll biometrics for a newly-registered user ──────────────────────────
+async function enrollBiometrics(username: string): Promise<void> {
+    // 1. Get registration options from backend
+    const startRes = await fetch(
+        `http://localhost:8000/api/auth/biometric/register/start?username=${encodeURIComponent(username)}`,
+        { method: 'POST' }
+    );
+    if (!startRes.ok) throw new Error(await startRes.text());
+    const rawOptions = await startRes.json();
+    const creationOptions = prepareRegistrationOptions(rawOptions);
+
+    // 2. Trigger real OS biometric prompt (Windows Hello / Touch ID)
+    const credential = await navigator.credentials.create({ publicKey: creationOptions }) as PublicKeyCredential;
+    if (!credential) throw new Error('No credential returned by browser');
+
+    const attResponse = credential.response as AuthenticatorAttestationResponse;
+
+    // 3. Send real credential to backend for verification + storage
+    const finishRes = await fetch(
+        `http://localhost:8000/api/auth/biometric/register/finish?username=${encodeURIComponent(username)}`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: credential.id,
+                rawId: bufferToBase64url(credential.rawId),
+                type: credential.type,
+                response: {
+                    clientDataJSON: bufferToBase64url(attResponse.clientDataJSON),
+                    attestationObject: bufferToBase64url(attResponse.attestationObject),
+                },
+            }),
+        }
+    );
+    if (!finishRes.ok) throw new Error(await finishRes.text());
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = () => {
@@ -16,10 +97,64 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [statusMsg, setStatusMsg] = useState<string | null>(null);
+
+    // ── Auto-trigger biometric on page load ──────────────────────────────────
+    useEffect(() => {
+        if (!window.PublicKeyCredential) return;
+        const autoLogin = async () => {
+            try {
+                // 1. Get discoverable challenge (no username needed)
+                const startRes = await fetch('http://localhost:8000/api/auth/biometric/discover/start', { method: 'POST' });
+                if (!startRes.ok) return;
+                const rawOptions = await startRes.json();
+                const requestOptions = prepareAuthenticationOptions(rawOptions);
+
+                // 2. Prompt OS biometric — user sees finger/face prompt instantly
+                const assertion = await navigator.credentials.get({
+                    publicKey: requestOptions,
+                    mediation: 'optional' as CredentialMediationRequirement,
+                } as any) as PublicKeyCredential;
+                if (!assertion) return;
+
+                const assResponse = assertion.response as AuthenticatorAssertionResponse;
+
+                // 3. Verify with backend (identifies user from userHandle)
+                const finishRes = await fetch('http://localhost:8000/api/auth/biometric/discover/finish', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: assertion.id,
+                        rawId: bufferToBase64url(assertion.rawId),
+                        type: assertion.type,
+                        response: {
+                            clientDataJSON: bufferToBase64url(assResponse.clientDataJSON),
+                            authenticatorData: bufferToBase64url(assResponse.authenticatorData),
+                            signature: bufferToBase64url(assResponse.signature),
+                            userHandle: assResponse.userHandle ? bufferToBase64url(assResponse.userHandle) : null,
+                        },
+                    }),
+                });
+
+                const data = await finishRes.json();
+                if (finishRes.ok && data.token) {
+                    localStorage.setItem('token', data.token);
+                    window.location.reload();
+                }
+            } catch (e: any) {
+                // Silently ignore — user can still use password login
+                if (e.name !== 'NotAllowedError') {
+                    console.debug('Auto biometric skipped:', e.message);
+                }
+            }
+        };
+        autoLogin();
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
+        setStatusMsg(null);
 
         if (!username.trim() || !password.trim()) {
             setError('CREDENTIALS REQUIRED');
@@ -38,6 +173,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                 const success = await register(username, password);
                 if (!success) {
                     setError('OPERATOR ID ALREADY TAKEN');
+                } else {
+                    // Auto-enroll biometrics right after password registration
+                    if (window.PublicKeyCredential) {
+                        try {
+                            setStatusMsg('ENROLLING BIOMETRICS — FOLLOW THE PROMPT...');
+                            await enrollBiometrics(username);
+                            setStatusMsg('BIOMETRICS ENROLLED ✓ — PLEASE LOG IN');
+                        } catch (bioErr: any) {
+                            // Don't block them — biometric enrollment is optional
+                            console.warn('Biometric enrollment skipped:', bioErr.message);
+                            setStatusMsg('ACCOUNT CREATED — BIOMETRICS SKIPPED');
+                        }
+                    } else {
+                        setStatusMsg('ACCOUNT CREATED — BROWSER DOES NOT SUPPORT BIOMETRICS');
+                    }
+                    setIsRegistering(false);
+                    setPassword('');
                 }
             } else {
                 const success = await login(username, password);
@@ -52,37 +204,157 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
         }
     };
 
+    const handleBiometricLogin = async () => {
+        if (!username.trim()) {
+            setError('ENTER OPERATOR ID FOR BIOMETRICS');
+            return;
+        }
+
+        if (!window.PublicKeyCredential) {
+            setError('BIOMETRICS NOT SUPPORTED ON THIS BROWSER');
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+        setStatusMsg('PROMPTING BIOMETRIC SCANNER...');
+
+        try {
+            // 1. Get authentication challenge from backend
+            const startRes = await fetch(
+                `http://localhost:8000/api/auth/biometric/login/start?username=${encodeURIComponent(username)}`,
+                { method: 'POST' }
+            );
+            if (!startRes.ok) {
+                const errData = await startRes.json().catch(() => ({}));
+                throw new Error(errData.detail || 'Failed to start biometric login');
+            }
+            const rawOptions = await startRes.json();
+            const requestOptions = prepareAuthenticationOptions(rawOptions);
+
+            // 2. Trigger real OS biometric prompt
+            const assertion = await navigator.credentials.get({ publicKey: requestOptions }) as PublicKeyCredential;
+            if (!assertion) throw new Error('No assertion returned');
+
+            const assResponse = assertion.response as AuthenticatorAssertionResponse;
+
+            // 3. Send to backend for signature verification
+            const finishRes = await fetch(
+                `http://localhost:8000/api/auth/biometric/login/finish?username=${encodeURIComponent(username)}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: assertion.id,
+                        rawId: bufferToBase64url(assertion.rawId),
+                        type: assertion.type,
+                        response: {
+                            clientDataJSON: bufferToBase64url(assResponse.clientDataJSON),
+                            authenticatorData: bufferToBase64url(assResponse.authenticatorData),
+                            signature: bufferToBase64url(assResponse.signature),
+                            userHandle: assResponse.userHandle ? bufferToBase64url(assResponse.userHandle) : null,
+                        },
+                    }),
+                }
+            );
+
+            const data = await finishRes.json();
+            if (finishRes.ok && data.token) {
+                localStorage.setItem('token', data.token);
+                window.location.reload();
+            } else {
+                throw new Error(data.detail || 'Biometric verification failed');
+            }
+        } catch (e: any) {
+            console.error(e);
+            if (e.name === 'NotAllowedError') {
+                setError('BIOMETRIC SCAN CANCELLED OR TIMED OUT');
+            } else if (e.name === 'InvalidStateError') {
+                setError('NO BIOMETRIC REGISTERED — USE PASSWORD LOGIN');
+            } else {
+                setError(e.message?.toUpperCase() || 'BIOMETRICS UNAVAILABLE');
+            }
+            setStatusMsg(null);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleEnrollBiometrics = async () => {
+        if (!username.trim() || !password.trim()) {
+            setError('ENTER OPERATOR ID AND ACCESS CODE TO ENROLL BIOMETRICS');
+            return;
+        }
+        if (!window.PublicKeyCredential) {
+            setError('BIOMETRICS NOT SUPPORTED ON THIS BROWSER');
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+        setStatusMsg('VERIFYING CREDENTIALS...');
+
+        try {
+            // 1. Verify password — only account owner can enroll biometrics
+            const verifyRes = await fetch('http://localhost:8000/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password }),
+            });
+            if (!verifyRes.ok) {
+                throw new Error('INVALID CREDENTIALS — CANNOT ENROLL BIOMETRICS');
+            }
+
+            // 2. Trigger Windows Hello enrollment
+            setStatusMsg('FOLLOW THE WINDOWS HELLO PROMPT TO ENROLL...');
+            await enrollBiometrics(username);
+            setStatusMsg('BIOMETRICS ENROLLED ✓ — USE FACE ID / TOUCH ID TO LOGIN');
+        } catch (e: any) {
+            if (e.name === 'NotAllowedError') {
+                setError('BIOMETRIC SCAN CANCELLED');
+            } else {
+                setError(e.message?.toUpperCase() || 'ENROLLMENT FAILED');
+            }
+            setStatusMsg(null);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <div className="login-container" style={{
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             justifyContent: 'center',
-            height: '100vh',
-            background: '#0a0a0a',
+            minHeight: '100vh',
+            background: '#0f172a',
             color: '#e0e0e0',
             fontFamily: 'monospace',
             position: 'relative',
-            overflow: 'hidden'
+            overflowY: 'auto',
+            paddingTop: '2rem',
+            paddingBottom: '2rem',
         }}>
             {/* Background Grid */}
             <div style={{
                 position: 'absolute',
                 inset: 0,
-                backgroundImage: 'linear-gradient(rgba(0, 255, 65, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 255, 65, 0.03) 1px, transparent 1px)',
+                backgroundImage: 'linear-gradient(rgba(16, 185, 129, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(16, 185, 129, 0.05) 1px, transparent 1px)',
                 backgroundSize: '20px 20px',
                 pointerEvents: 'none'
             }}></div>
 
             <div className="login-card" style={{
                 width: '400px',
-                padding: '2rem',
-                background: 'rgba(20, 20, 25, 0.9)',
-                border: '1px solid #333',
-                borderRadius: '8px',
-                boxShadow: '0 0 20px rgba(0, 0, 0, 0.5)',
+                maxWidth: '95vw',
+                padding: '2.5rem',
+                background: 'rgba(30, 41, 59, 0.9)',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+                borderRadius: '16px',
+                boxShadow: '0 0 40px rgba(0, 0, 0, 0.5)',
                 position: 'relative',
-                zIndex: 10
+                zIndex: 10,
+                backdropFilter: 'blur(10px)'
             }}>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                     <div style={{
@@ -92,23 +364,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                         width: '64px',
                         height: '64px',
                         borderRadius: '50%',
-                        background: 'rgba(0, 255, 65, 0.1)',
+                        background: 'rgba(16, 185, 129, 0.1)',
                         marginBottom: '1rem',
-                        border: '1px solid rgba(0, 255, 65, 0.3)'
+                        border: '1px solid rgba(16, 185, 129, 0.3)'
                     }}>
-                        <ShieldCheck size={32} color="#00ff41" />
+                        <ShieldCheck size={32} color="#10b981" />
                     </div>
-                    <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: '0', letterSpacing: '2px', color: '#fff' }}>
-                        SCAM<span style={{ color: '#00ff41' }}>DEFENDER</span>
+                    <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: '0', letterSpacing: '-0.5px', color: '#fff' }}>
+                        SCAM<span style={{ color: '#10b981' }}>DEFENDER</span>
                     </h1>
-                    <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '0.5rem' }}>
+                    <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.5rem', letterSpacing: '1px' }}>
                         {isRegistering ? 'NEW OPERATOR ENROLLMENT' : 'AUTHORIZED PERSONNEL ONLY'}
                     </p>
                 </div>
 
                 <form onSubmit={handleSubmit}>
                     <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.8rem', color: '#888' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>
                             {isRegistering ? 'CREATE OPERATOR ID' : 'OPERATOR ID'}
                         </label>
                         <div style={{ position: 'relative' }}>
@@ -116,25 +388,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                                 type="text"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
-                                autoFocus
                                 style={{
                                     width: '100%',
-                                    padding: '10px 10px 10px 40px',
-                                    background: 'rgba(0, 0, 0, 0.5)',
-                                    border: '1px solid #333',
-                                    borderRadius: '4px',
+                                    padding: '12px 12px 12px 40px',
+                                    background: 'rgba(0, 0, 0, 0.3)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    borderRadius: '8px',
                                     color: '#fff',
-                                    fontFamily: 'monospace',
-                                    outline: 'none'
+                                    fontFamily: 'Inter, sans-serif',
+                                    outline: 'none',
+                                    fontSize: '0.9rem'
                                 }}
                                 placeholder="Enter ID..."
                             />
-                            <Fingerprint size={18} color="#555" style={{ position: 'absolute', left: '12px', top: '12px' }} />
+                            <Fingerprint size={18} color="#64748b" style={{ position: 'absolute', left: '12px', top: '12px' }} />
                         </div>
                     </div>
 
                     <div className="form-group" style={{ marginBottom: '2rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.8rem', color: '#888' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>
                             {isRegistering ? 'CREATE ACCESS CODE' : 'ACCESS CODE'}
                         </label>
                         <div style={{ position: 'relative' }}>
@@ -144,28 +416,29 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                                 onChange={(e) => setPassword(e.target.value)}
                                 style={{
                                     width: '100%',
-                                    padding: '10px 40px 10px 40px',
-                                    background: 'rgba(0, 0, 0, 0.5)',
-                                    border: '1px solid #333',
-                                    borderRadius: '4px',
+                                    padding: '12px 40px 12px 40px',
+                                    background: 'rgba(0, 0, 0, 0.3)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    borderRadius: '8px',
                                     color: '#fff',
-                                    fontFamily: 'monospace',
-                                    outline: 'none'
+                                    fontFamily: 'Inter, sans-serif',
+                                    outline: 'none',
+                                    fontSize: '0.9rem'
                                 }}
                                 placeholder="••••••••"
                             />
-                            <Lock size={18} color="#555" style={{ position: 'absolute', left: '12px', top: '12px' }} />
+                            <Lock size={18} color="#64748b" style={{ position: 'absolute', left: '12px', top: '12px' }} />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
                                 style={{
                                     position: 'absolute',
-                                    right: '10px',
-                                    top: '10px',
+                                    right: '12px',
+                                    top: '12px',
                                     background: 'none',
                                     border: 'none',
                                     cursor: 'pointer',
-                                    color: '#555',
+                                    color: '#64748b',
                                     padding: 0
                                 }}
                             >
@@ -176,7 +449,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
 
                     {isRegistering && (
                         <div className="form-group" style={{ marginBottom: '2rem' }}>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.8rem', color: '#888' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>
                                 CONFIRM ACCESS CODE
                             </label>
                             <div style={{ position: 'relative' }}>
@@ -186,34 +459,56 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                                     onChange={(e) => setConfirmPassword(e.target.value)}
                                     style={{
                                         width: '100%',
-                                        padding: '10px 40px 10px 40px',
-                                        background: 'rgba(0, 0, 0, 0.5)',
-                                        border: '1px solid #333',
-                                        borderRadius: '4px',
+                                        padding: '12px 12px 12px 40px',
+                                        background: 'rgba(0, 0, 0, 0.3)',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        borderRadius: '8px',
                                         color: '#fff',
-                                        fontFamily: 'monospace',
-                                        outline: 'none'
+                                        fontFamily: 'Inter, sans-serif',
+                                        outline: 'none',
+                                        fontSize: '0.9rem'
                                     }}
                                     placeholder="••••••••"
                                 />
-                                <ShieldCheck size={18} color="#555" style={{ position: 'absolute', left: '12px', top: '12px' }} />
+                                <ShieldCheck size={18} color="#64748b" style={{ position: 'absolute', left: '12px', top: '12px' }} />
                             </div>
                         </div>
                     )}
 
+                    {statusMsg && (
+                        <div style={{
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            color: '#6ee7b7',
+                            padding: '0.75rem',
+                            borderRadius: '8px',
+                            fontSize: '0.8rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.5rem',
+                            marginBottom: '1rem',
+                            letterSpacing: '0.5px'
+                        }}>
+                            <ShieldCheck size={16} /> {statusMsg}
+                        </div>
+                    )}
 
                     {error && (
                         <div style={{
                             background: 'rgba(239, 68, 68, 0.1)',
-                            border: '1px solid #ef4444',
-                            color: '#ef4444',
-                            padding: '0.5rem',
-                            borderRadius: '4px',
+                            border: '1px solid rgba(239, 68, 68, 0.2)',
+                            color: '#fca5a5',
+                            padding: '0.75rem',
+                            borderRadius: '8px',
                             fontSize: '0.8rem',
-                            textAlign: 'center',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.5rem',
                             marginBottom: '1.5rem'
                         }}>
-                            ⚠ {error}
+                            <AlertTriangle size={16} /> {error}
                         </div>
                     )}
 
@@ -223,17 +518,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                         style={{
                             width: '100%',
                             padding: '12px',
-                            background: isLoading ? '#333' : '#00ff41',
-                            color: isLoading ? '#888' : '#000',
+                            background: isLoading ? '#334155' : '#10b981',
+                            color: isLoading ? '#94a3b8' : '#000',
                             border: 'none',
-                            borderRadius: '4px',
-                            fontWeight: 'bold',
+                            borderRadius: '8px',
+                            fontWeight: 700,
                             cursor: isLoading ? 'not-allowed' : 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             gap: '0.5rem',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.2s',
+                            fontSize: '0.9rem'
                         }}
                     >
                         {isLoading ? (
@@ -242,10 +538,66 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                             <>
                                 {isRegistering ? <UserPlus size={18} /> : <Lock size={18} />}
                                 <span>{isRegistering ? 'ENROLL OPERATOR' : 'AUTHENTICATE'}</span>
-                                <ChevronRight size={18} />
                             </>
                         )}
                     </button>
+
+                    {!isRegistering && (
+                        <button
+                            type="button"
+                            onClick={handleBiometricLogin}
+                            disabled={isLoading}
+                            style={{
+                                width: '100%',
+                                padding: '12px',
+                                background: 'transparent',
+                                border: '1px solid rgba(16, 185, 129, 0.3)',
+                                color: '#10b981',
+                                borderRadius: '8px',
+                                fontWeight: 600,
+                                cursor: isLoading ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.5rem',
+                                transition: 'all 0.2s',
+                                fontSize: '0.9rem',
+                                marginTop: '1rem'
+                            }}
+                        >
+                            <ScanFace size={18} />
+                            <span>FACE ID / TOUCH ID</span>
+                        </button>
+                    )}
+
+                    {!isRegistering && (
+                        <button
+                            type="button"
+                            onClick={handleEnrollBiometrics}
+                            disabled={isLoading}
+                            style={{
+                                width: '100%',
+                                padding: '10px',
+                                background: 'transparent',
+                                border: '1px solid rgba(99, 102, 241, 0.4)',
+                                color: '#a5b4fc',
+                                borderRadius: '8px',
+                                fontWeight: 600,
+                                cursor: isLoading ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.5rem',
+                                transition: 'all 0.2s',
+                                fontSize: '0.8rem',
+                                marginTop: '0.5rem',
+                                letterSpacing: '0.5px'
+                            }}
+                        >
+                            <Fingerprint size={16} />
+                            <span>ENROLL BIOMETRICS FOR THIS ACCOUNT</span>
+                        </button>
+                    )}
                 </form>
 
                 <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
@@ -254,28 +606,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                         style={{
                             background: 'none',
                             border: 'none',
-                            color: '#888',
-                            fontSize: '0.75rem',
+                            color: '#94a3b8',
+                            fontSize: '0.8rem',
                             cursor: 'pointer',
-                            textDecoration: 'underline'
+                            textDecoration: 'none'
                         }}
                     >
-                        {isRegistering ? 'ALREADY HAVE AN ACCOUNT? LOGIN' : 'NEW OPERATOR? REGISTER HERE'}
+                        {isRegistering ? 'ALREADY HAVE AN ACCOUNT? LOGIN' : 'NEW OPERATOR? ENROLL DEVICE'}
                     </button>
-                </div>
-
-                <div style={{
-                    marginTop: '2rem',
-                    textAlign: 'center',
-                    fontSize: '0.7rem',
-                    color: '#555',
-                    borderTop: '1px solid #222',
-                    paddingTop: '1rem'
-                }}>
-                    SECURE CONNECTION ESTABLISHED • AES-256 ENCRYPTED
                 </div>
             </div>
         </div>
     );
 };
-
