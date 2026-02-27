@@ -2,12 +2,18 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, Text, Bool
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import datetime
+import os
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./scam_honeypot.db"
+# On Render, the persistent disk is mounted at /data
+# Locally, use the project root
+DB_PATH = os.environ.get("DATABASE_URL", "sqlite:///./scam_honeypot.db")
+if DB_PATH.startswith("sqlite"):
+    SQLALCHEMY_DATABASE_URL = DB_PATH
+else:
+    SQLALCHEMY_DATABASE_URL = DB_PATH
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+connect_args = {"check_same_thread": False} if SQLALCHEMY_DATABASE_URL.startswith("sqlite") else {}
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
