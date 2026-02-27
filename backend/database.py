@@ -4,13 +4,17 @@ from sqlalchemy.orm import sessionmaker
 import datetime
 import os
 
-# On Render, the persistent disk is mounted at /data
-# Locally, use the project root
-DB_PATH = os.environ.get("DATABASE_URL", "sqlite:///./scam_honeypot.db")
-if DB_PATH.startswith("sqlite"):
-    SQLALCHEMY_DATABASE_URL = DB_PATH
+# Determine database URL - always use a path we can write to
+_db_url = os.environ.get("DATABASE_URL", "")
+
+if not _db_url or _db_url.startswith("sqlite"):
+    # Use a path inside the working directory (always writable in Docker)
+    _db_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scam_honeypot.db")
+    SQLALCHEMY_DATABASE_URL = f"sqlite:///{_db_file}"
+    # Ensure parent directory exists
+    os.makedirs(os.path.dirname(_db_file), exist_ok=True)
 else:
-    SQLALCHEMY_DATABASE_URL = DB_PATH
+    SQLALCHEMY_DATABASE_URL = _db_url
 
 connect_args = {"check_same_thread": False} if SQLALCHEMY_DATABASE_URL.startswith("sqlite") else {}
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args=connect_args)
