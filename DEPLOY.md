@@ -1,4 +1,4 @@
-# 🚀 Deploying Scam Defender Honeypot to the Cloud
+# 🚀 Deploying Rakshak AI to the Cloud
 
 This guide walks you through deploying the app publicly using **Render** (backend) and **Vercel** (frontend). Once done, anyone can access the app from any device.
 

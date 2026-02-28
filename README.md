@@ -1,4 +1,4 @@
-# Honeypot Scam Defendor 🛡️🤖
+# Rakshak AI 🛡️🤖
 
 An AI-powered honeypot system designed to engage with and analyze scammers in real-time. This project uses multiple personas to trap scammers, extract intelligence, and generate evidence for cybersecurity teams.
 
