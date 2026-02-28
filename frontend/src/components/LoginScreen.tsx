@@ -396,56 +396,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                 </div>
             )}
 
-            {/* â”€â”€ MODE: BIOMETRIC (auto-scanning) â”€â”€ */}
-            {mode === 'biometric' && (
-                <div style={cardStyle}>
-                    <Header subtitle="BIOMETRIC VERIFICATION" />
-                    <div style={{ textAlign: 'center', padding: '1rem 0' }}>
-                        <div style={{ fontSize: '4rem', marginBottom: '1rem', animation: 'pulse 1.5s infinite' }}>
-                            <ScanFace size={72} color="#10b981" style={{ margin: '0 auto', display: 'block' }} />
-                        </div>
-                        <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                            WELCOME BACK
-                        </p>
-                        <p style={{ color: '#fff', fontSize: '1.1rem', fontWeight: 700, letterSpacing: '1px', marginBottom: '1.5rem' }}>
-                            {username.toUpperCase()}
-                        </p>
-                        {isLoading && (
-                            <p style={{ color: '#10b981', fontSize: '0.8rem', letterSpacing: '1px' }}>
-                                {statusMsg || 'WAITING FOR BIOMETRIC...'}
-                            </p>
-                        )}
-                        {!isLoading && (
-                            <button type="button" onClick={() => triggerBiometric(username)} style={btnPrimary}>
-                                <ScanFace size={18} /><span>SCAN FINGERPRINT / FACE ID</span>
-                            </button>
-                        )}
-                        <button type="button" onClick={() => { setMode('password'); setError(null); }} style={btnGhost}>
-                            USE PASSWORD INSTEAD
-                        </button>
-                        <button type="button" onClick={() => { localStorage.removeItem('scam_last_user'); localStorage.removeItem('scam_registered'); setMode('register'); }} style={{ ...btnGhost, color: '#64748b', border: '1px solid rgba(100,116,139,0.3)', marginTop: '0.4rem', fontSize: '0.75rem' }}>
-                            NOT {username.toUpperCase()}? SWITCH ACCOUNT
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* â”€â”€ MODE: PASSWORD â”€â”€ */}
-            {mode === 'password' && (
+            {/* ── RETURNING USER: password + biometric on same screen (PhonePe style) ── */}
+            {(mode === 'biometric' || mode === 'password') && (
                 <div style={cardStyle}>
                     <Header subtitle="AUTHORIZED PERSONNEL ONLY" />
+
+                    {/* Welcome back with username */}
+                    <div style={{ textAlign: 'center', marginBottom: '1.5rem', padding: '0.75rem', background: 'rgba(16,185,129,0.06)', borderRadius: '10px', border: '1px solid rgba(16,185,129,0.15)' }}>
+                        <p style={{ color: '#94a3b8', fontSize: '0.7rem', letterSpacing: '1px', marginBottom: '0.25rem' }}>WELCOME BACK</p>
+                        <p style={{ color: '#10b981', fontSize: '1.1rem', fontWeight: 700, letterSpacing: '2px', margin: 0 }}>{username.toUpperCase()}</p>
+                    </div>
+
+                    {/* Password form */}
                     <form onSubmit={handlePasswordLogin}>
                         <div style={{ marginBottom: '1.2rem' }}>
-                            <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>OPERATOR ID</label>
-                            <div style={{ position: 'relative' }}>
-                                <input type="text" value={username} onChange={e => setUsername(e.target.value)} style={inputStyle} placeholder="Enter ID..." />
-                                <Fingerprint size={18} color="#64748b" style={{ position: 'absolute', left: 12, top: 12 }} />
-                            </div>
-                        </div>
-                        <div style={{ marginBottom: '1.5rem' }}>
                             <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>ACCESS CODE</label>
                             <div style={{ position: 'relative' }}>
-                                <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} style={{ ...inputStyle, paddingRight: 40 }} placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" />
+                                <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} style={{ ...inputStyle, paddingRight: 40 }} placeholder="••••••••" autoFocus />
                                 <Lock size={18} color="#64748b" style={{ position: 'absolute', left: 12, top: 12 }} />
                                 <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: 12, top: 12, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 0 }}>
                                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -457,13 +424,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                             {isLoading ? <span>VERIFYING...</span> : <><Lock size={18} /><span>AUTHENTICATE</span></>}
                         </button>
                     </form>
-                    {lastUser && (
-                        <button type="button" onClick={() => { setMode('biometric'); setError(null); triggerBiometric(username); }} style={btnGhost}>
-                            <ScanFace size={16} style={{ display: 'inline', marginRight: 6 }} />TRY BIOMETRICS INSTEAD
-                        </button>
-                    )}
-                    <button type="button" onClick={() => { setMode('register'); setError(null); }} style={{ ...btnGhost, color: '#64748b', border: '1px solid rgba(100,116,139,0.3)', marginTop: '0.4rem', fontSize: '0.75rem' }}>
-                        NEW USER? CREATE ACCOUNT â†’
+
+                    {/* OR divider */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '1.25rem 0' }}>
+                        <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+                        <span style={{ color: '#475569', fontSize: '0.75rem', letterSpacing: '1px' }}>OR</span>
+                        <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+                    </div>
+
+                    {/* Biometric button */}
+                    <button type="button" onClick={() => triggerBiometric(username)} disabled={isLoading} style={{ ...btnPrimary, background: 'transparent', border: '1px solid rgba(16,185,129,0.4)', color: '#10b981', marginTop: 0, cursor: isLoading ? 'not-allowed' : 'pointer' }}>
+                        {isLoading && statusMsg ? <span>{statusMsg}</span> : <><ScanFace size={20} /><span>FINGERPRINT / FACE ID</span></>}
+                    </button>
+
+                    {/* Switch account */}
+                    <button type="button" onClick={() => { localStorage.removeItem('scam_last_user'); localStorage.removeItem('scam_registered'); setMode('register'); }} style={{ ...btnGhost, color: '#475569', border: '1px solid rgba(71,85,105,0.25)', marginTop: '0.75rem', fontSize: '0.75rem' }}>
+                        NOT {username.toUpperCase()}? SWITCH ACCOUNT
                     </button>
                 </div>
             )}
