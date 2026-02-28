@@ -3,8 +3,10 @@ from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
+import os
+
 # Configuration
-SECRET_KEY = "HACKME_PLEASE_CHANGE_THIS_IN_PROD_BUT_IT_IS_A_HONEYPOT_SO_MAYBE_NOT"
+SECRET_KEY = os.environ.get("SECRET_KEY", "HACKME_PLEASE_CHANGE_THIS_IN_PROD_BUT_IT_IS_A_HONEYPOT_SO_MAYBE_NOT")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
