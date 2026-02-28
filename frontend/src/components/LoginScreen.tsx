@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Lock, Fingerprint, EyeOff, Eye, AlertTriangle, ScanFace, UserPlus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/config';
@@ -93,7 +93,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
     const { login, register } = useAuth();
     // Show registration on first visit, login on return visits
     const [isRegistering, setIsRegistering] = useState(!localStorage.getItem('scam_registered'));
-    const [username, setUsername] = useState('');
+    // Auto-fill last logged-in username for returning users
+    const [username, setUsername] = useState(localStorage.getItem('scam_last_user') || '');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -101,7 +102,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
     const [error, setError] = useState<string | null>(null);
     const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
-    // ── Removed Auto-trigger biometric on page load to prevent unwanted dialogs ──
+    // Auto-trigger biometric on page load for returning users (no button needed)
+    useEffect(() => {
+        const lastUser = localStorage.getItem('scam_last_user');
+        const hasRegistered = localStorage.getItem('scam_registered');
+        if (!isRegistering && lastUser && hasRegistered && window.PublicKeyCredential) {
+            // Small delay so the UI renders first
+            setTimeout(() => handleBiometricLogin(lastUser), 800);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -157,8 +167,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
         }
     };
 
-    const handleBiometricLogin = async () => {
-        if (!username.trim()) {
+    const handleBiometricLogin = async (usernameOverride?: string) => {
+        const activeUser = usernameOverride || username;
+        if (!activeUser.trim()) {
             setError('ENTER OPERATOR ID FOR BIOMETRICS');
             return;
         }
@@ -175,7 +186,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
         try {
             // 1. Get authentication challenge from backend
             const startRes = await fetch(
-                `${API_BASE_URL}/api/auth/biometric/login/start?username=${encodeURIComponent(username)}`,
+                `${API_BASE_URL}/api/auth/biometric/login/start?username=${encodeURIComponent(activeUser)}`,
                 { method: 'POST' }
             );
             if (!startRes.ok) {
@@ -193,7 +204,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
 
             // 3. Send to backend for signature verification
             const finishRes = await fetch(
-                `${API_BASE_URL}/api/auth/biometric/login/finish?username=${encodeURIComponent(username)}`,
+                `${API_BASE_URL}/api/auth/biometric/login/finish?username=${encodeURIComponent(activeUser)}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -214,6 +225,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
             const data = await finishRes.json();
             if (finishRes.ok && data.token) {
                 localStorage.setItem('token', data.token);
+                localStorage.setItem('scam_last_user', activeUser);
                 window.location.reload();
             } else {
                 throw new Error(data.detail || 'Biometric verification failed');
@@ -520,7 +532,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                     {!isRegistering && (
                         <button
                             type="button"
-                            onClick={handleBiometricLogin}
+                            onClick={() => handleBiometricLogin()}
                             disabled={isLoading}
                             style={{
                                 width: '100%',
