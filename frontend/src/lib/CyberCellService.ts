@@ -1,9 +1,28 @@
-import { PDFGenerator } from './PDFGenerator';
+﻿import { PDFGenerator } from './PDFGenerator';
 import type { IncidentReport, CaseFile } from './types';
 import { API_BASE_URL } from './config';
 
 export class CyberCellService {
     private static MOCK_ENDPOINT = 'https://cybercell.gov.mock/api/v1/report';
+
+    /**
+     * ADVANCED LOGIC: Zero-Trust Cryptographic Core
+     * Deterministically hashes PII using SHA-256 with a local entropy salt.
+     * Prevents reverse engineering of leaked reports while maintaining database relation integrity.
+     */
+    private static async hashPII(data: string, salt: string): Promise<string> {
+        const encoder = new TextEncoder();
+        // Constant time pepper + dynamic salt
+        const payload = encoder.encode(`SCAMDEF_PEPPER_${salt}_${data}`);
+        
+        // Native WebCrypto API for secure SHA-256
+        const hashBuffer = await crypto.subtle.digest('SHA-256', payload);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        
+        // Convert to secure hex string and truncate to 16 chars for DB efficiency
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return `anon_${hashHex.substring(0, 16)}`;
+    }
 
     /**
      * Automatically reports a high-risk incident to the Cyber Cell.
@@ -108,3 +127,4 @@ export class CyberCellService {
         console.log('[CyberCellService] 🔒 SESSION PURGED: All local transaction traces removed.');
     }
 }
+

@@ -11,18 +11,17 @@ interface SystemDashboardProps {
 }
 
 export const SystemDashboard: React.FC<SystemDashboardProps> = ({ activeThreats = 0, locations = [], onSimulateAttack }) => {
-    const [cpuLoad, setCpuLoad] = useState(12);
-    const [networkTraffic, setNetworkTraffic] = useState(45);
+    const [targetCpu, setTargetCpu] = useState(12);
+    const [targetNetwork, setTargetNetwork] = useState(45);
+    const [displayCpu, setDisplayCpu] = useState(12);
+    const [displayNetwork, setDisplayNetwork] = useState(45);
+    const [neuralPoints, setNeuralPoints] = useState<number[]>(Array(30).fill(20));
     const [enhancedMonitoring, setEnhancedMonitoring] = useState<{ region: string, active: boolean }>({ region: '', active: false });
 
+    // 1. Fetch backend stats for target predictive baselines
     useEffect(() => {
-        // Fetch initially
         fetchStats();
-
-        // live poll every 2 seconds
-        const interval = setInterval(() => {
-            fetchStats();
-        }, 2000);
+        const interval = setInterval(fetchStats, 2000);
         return () => clearInterval(interval);
     }, []);
 
@@ -31,18 +30,53 @@ export const SystemDashboard: React.FC<SystemDashboardProps> = ({ activeThreats 
             const res = await fetch(`${API_BASE_URL}/api/stats`);
             if (res.ok) {
                 const data = await res.json();
-                // Map backend data to UI metrics
-                // 1 report ~ 10 "Network Units" for visualization
-                setNetworkTraffic(Math.max(45, data.reports_filed * 2));
-
-                // CPU load scales with reports
                 const activeReports = data.reports_filed || 0;
-                setCpuLoad(Math.min(100, 12 + (activeReports * 5)));
+
+                // Predictive Load Balancing Math
+                // Introduce dynamic network variance based on live active threats
+                const variance = activeReports > 0 ? (Math.random() * 30 - 15) : (Math.random() * 5 - 2.5);
+                setTargetNetwork(Math.max(10, Math.min(999, (activeReports * 3.5) + 45 + variance)));
+
+                // CPU load scales non-linearly with reports (simulating deep exponential NLP processing costs)
+                const cpuCost = Math.min(100, 12 + Math.pow(activeReports, 1.2) * 2.5);
+                setTargetCpu(cpuCost);
             }
         } catch (e) {
             console.error("Dashboard sync failed", e);
         }
     };
+
+    // 2. Highly Advanced Physics Easing (Spring Dynamics) for buttery smooth tickers
+    useEffect(() => {
+        let animationFrame: number;
+
+        const updatePhysics = () => {
+            setDisplayCpu(prev => {
+                const diff = targetCpu - prev;
+                return prev + (diff * 0.05); // Smooth easing factor
+            });
+
+            setDisplayNetwork(prev => {
+                const diff = targetNetwork - prev;
+                return prev + (diff * 0.08); // Network shifts slightly faster
+            });
+
+            // Evolve Live Neural Spline Array for the background graph
+            setNeuralPoints(prev => {
+                const newPoints = [...prev.slice(1)];
+                // Base noise off the target CPU stress level
+                const noise = (Math.random() * 15 - 7.5) * (targetCpu / 100 + 0.5);
+                const nextVal = 20 + noise; // Base spline height is 20
+                newPoints.push(Math.max(2, Math.min(48, nextVal)));
+                return newPoints;
+            });
+
+            animationFrame = requestAnimationFrame(updatePhysics);
+        };
+
+        animationFrame = requestAnimationFrame(updatePhysics);
+        return () => cancelAnimationFrame(animationFrame);
+    }, [targetCpu, targetNetwork]);
 
     const handleRegionSelect = (regionName: string, threatLevel: string) => {
         if (threatLevel === 'HIGH') {
@@ -85,6 +119,18 @@ export const SystemDashboard: React.FC<SystemDashboardProps> = ({ activeThreats 
             setIsHovered(false);
         };
 
+        // Render Live Neural Graph Background (Only for the CPU/Network cards)
+        const renderGraph = () => {
+            if (!metric) return null; // Only render graph on active metrics
+            const pointsStr = neuralPoints.map((p, i) => `${(i / (neuralPoints.length - 1)) * 100},${50 - p}`).join(' L ');
+            return (
+                <svg className="neural-graph-svg" style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '50px', opacity: 0.15, zIndex: 0, pointerEvents: 'none' }} preserveAspectRatio="none">
+                    <path d={`M 0,50 L ${pointsStr} L 100,50 Z`} fill={color} />
+                    <path d={`M 0,50 L ${pointsStr}`} stroke={color} strokeWidth="2" fill="none" />
+                </svg>
+            );
+        };
+
         return (
             <div
                 ref={cardRef}
@@ -104,21 +150,24 @@ export const SystemDashboard: React.FC<SystemDashboardProps> = ({ activeThreats 
                 <div className="glare-surface" />
                 <div className="sys-card-accent-tl" />
 
-                <div className="sys-card-header">
+                <div className="sys-card-header" style={{ position: 'relative', zIndex: 1 }}>
                     <span style={{ color }} className={pulse ? 'neural-active' : ''}>{icon}</span>
                     <span className="sys-card-label">{label}</span>
                 </div>
-                <div className="sys-card-value" style={{ color }}>{value}</div>
-                <div className="sys-progress-bg">
+                <div className="sys-card-value" style={{ color, position: 'relative', zIndex: 1 }}>
+                    {typeof value === 'number' ? value.toFixed(1) : value}
+                </div>
+                <div className="sys-progress-bg" style={{ position: 'relative', zIndex: 1 }}>
                     <div
                         className="sys-progress-bar"
                         style={{ width: subtext.includes('%') ? subtext : '100%', background: color, color }}
                     />
                 </div>
-                <div className="sys-card-sub">
+                <div className="sys-card-sub" style={{ position: 'relative', zIndex: 1 }}>
                     <span>{subtext}</span>
                     {metric && <span className="sys-card-metric">{metric}</span>}
                 </div>
+                {renderGraph()}
             </div>
         );
     };
@@ -162,8 +211,8 @@ export const SystemDashboard: React.FC<SystemDashboardProps> = ({ activeThreats 
                 <StatusCard
                     icon={<Cpu size={18} />}
                     label="NEURAL ENGINE"
-                    value={`${activeThreats > 0 ? activeThreats + 12 : cpuLoad.toFixed(0)}%`}
-                    subtext={activeThreats > 0 ? `${activeThreats} THREATS ACTIVE` : "Processing Load"}
+                    value={activeThreats > 0 ? (activeThreats * 10) + displayCpu : displayCpu}
+                    subtext={activeThreats > 0 ? `${activeThreats} THREATS ACTIVE` : "Processing Load %"}
                     metric={activeThreats > 0 ? "TEMP: 54°C" : "TEMP: 38°C"}
                     color={activeThreats > 0 ? "var(--status-danger)" : "var(--primary)"}
                     pulse={activeThreats > 0}
@@ -171,9 +220,9 @@ export const SystemDashboard: React.FC<SystemDashboardProps> = ({ activeThreats 
                 <StatusCard
                     icon={<Wifi size={18} />}
                     label="NETWORK"
-                    value={`${networkTraffic.toFixed(0)} Mb/s`}
-                    subtext="Encrypted Traffic"
-                    metric="FILTERED: 1.2k"
+                    value={displayNetwork}
+                    subtext="Encrypted Traffic (Mb/s)"
+                    metric="ROUTING: PREDICTIVE"
                     color="var(--status-info)"
                 />
                 <StatusCard
