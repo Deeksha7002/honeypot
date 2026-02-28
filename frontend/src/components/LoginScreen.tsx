@@ -88,6 +88,72 @@ async function enrollBiometrics(username: string): Promise<void> {
     );
     if (!finishRes.ok) throw new Error(await finishRes.text());
 }
+// ── Matrix Digital Rain Background ──────────────────────────────────────────
+const MatrixRain: React.FC = () => {
+    const canvasRef = React.useRef<HTMLCanvasElement>(null);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const resize = () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        };
+        resize();
+        window.addEventListener('resize', resize);
+
+        const CHARS = '01アイウエオカキクケコサシスセソタチツテトナニヌネノ';
+        const FONT_SIZE = 14;
+        let cols = Math.floor(canvas.width / FONT_SIZE);
+        const drops: number[] = Array(cols).fill(1);
+
+        let animId: number;
+        const draw = () => {
+            cols = Math.floor(canvas.width / FONT_SIZE);
+            // Fade trail
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            for (let i = 0; i < drops.length; i++) {
+                const char = CHARS[Math.floor(Math.random() * CHARS.length)];
+                // Brighter head, dimmer trail
+                const brightness = Math.random() > 0.02 ? 0.45 : 1;
+                ctx.fillStyle = `rgba(16, 185, 129, ${brightness})`;
+                ctx.font = `${FONT_SIZE}px monospace`;
+                ctx.fillText(char, i * FONT_SIZE, drops[i] * FONT_SIZE);
+
+                if (drops[i] * FONT_SIZE > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+            animId = requestAnimationFrame(draw);
+        };
+        animId = requestAnimationFrame(draw);
+
+        return () => {
+            cancelAnimationFrame(animId);
+            window.removeEventListener('resize', resize);
+        };
+    }, []);
+
+    return (
+        <canvas
+            ref={canvasRef}
+            style={{
+                position: 'fixed',
+                top: 0, left: 0,
+                width: '100%', height: '100%',
+                zIndex: 0,
+                pointerEvents: 'none',
+                opacity: 0.7,
+            }}
+        />
+    );
+};
 
 export const LoginScreen: React.FC<LoginScreenProps> = () => {
     const { login, register } = useAuth();
@@ -303,14 +369,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
             paddingTop: '2rem',
             paddingBottom: '2rem',
         }}>
-            {/* Background Grid */}
-            <div style={{
-                position: 'absolute',
-                inset: 0,
-                backgroundImage: 'linear-gradient(rgba(16, 185, 129, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(16, 185, 129, 0.05) 1px, transparent 1px)',
-                backgroundSize: '20px 20px',
-                pointerEvents: 'none'
-            }}></div>
+            {/* Matrix Digital Rain Background */}
+            <MatrixRain />
 
             <div className="login-card" style={{
                 width: '400px',
