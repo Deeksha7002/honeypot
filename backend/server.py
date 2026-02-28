@@ -301,7 +301,7 @@ def get_webauthn_config(request: Request):
     protocol = "https" if request.url.scheme == "https" else "http"
     return hostname, f"{protocol}://{host}"
 
-RP_NAME = "Scam Defender"
+RP_NAME = "Rakshak AI"
 
 # In-memory store for challenges
 challenges = {} 
