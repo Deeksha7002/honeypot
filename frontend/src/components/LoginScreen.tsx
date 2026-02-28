@@ -91,7 +91,8 @@ async function enrollBiometrics(username: string): Promise<void> {
 
 export const LoginScreen: React.FC<LoginScreenProps> = () => {
     const { login, register } = useAuth();
-    const [isRegistering, setIsRegistering] = useState(true);
+    // Show registration on first visit, login on return visits
+    const [isRegistering, setIsRegistering] = useState(!localStorage.getItem('scam_registered'));
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -139,6 +140,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                     } else {
                         setStatusMsg('ACCOUNT CREATED — BROWSER DOES NOT SUPPORT BIOMETRICS');
                     }
+                    localStorage.setItem('scam_registered', 'true');
                     setIsRegistering(false);
                     setPassword('');
                 }
