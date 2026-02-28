@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Lock, Fingerprint, EyeOff, Eye, AlertTriangle, ScanFace, UserPlus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/config';
@@ -8,7 +8,7 @@ interface LoginScreenProps {
     onLogin?: (username: string) => void;
 }
 
-// ── WebAuthn base64url helpers ──────────────────────────────────────────────
+// â”€â”€ WebAuthn base64url helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function base64urlToBuffer(base64url: string): ArrayBuffer {
     const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
     const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
@@ -25,7 +25,7 @@ function bufferToBase64url(buffer: ArrayBuffer): string {
     return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-// Converts challenge/id fields in options from base64url strings → ArrayBuffers
+// Converts challenge/id fields in options from base64url strings â†’ ArrayBuffers
 function prepareRegistrationOptions(options: any): PublicKeyCredentialCreationOptions {
     return {
         ...options,
@@ -52,7 +52,7 @@ function prepareAuthenticationOptions(options: any): PublicKeyCredentialRequestO
     };
 }
 
-// ── Enroll biometrics for a newly-registered user ──────────────────────────
+// â”€â”€ Enroll biometrics for a newly-registered user â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function enrollBiometrics(username: string): Promise<void> {
     // 1. Get registration options from backend
     const startRes = await fetch(
@@ -88,7 +88,7 @@ async function enrollBiometrics(username: string): Promise<void> {
     );
     if (!finishRes.ok) throw new Error(await finishRes.text());
 }
-// ── Matrix Digital Rain Background ──────────────────────────────────────────
+// â”€â”€ Matrix Digital Rain Background â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const MatrixRain: React.FC = () => {
     const canvasRef = React.useRef<HTMLCanvasElement>(null);
 
@@ -105,7 +105,7 @@ const MatrixRain: React.FC = () => {
         resize();
         window.addEventListener('resize', resize);
 
-        const CHARS = '01アイウエオカキクケコサシスセソタチツテトナニヌネノ';
+        const CHARS = '01ã‚¢ã‚¤ã‚¦ã‚¨ã‚ªã‚«ã‚­ã‚¯ã‚±ã‚³ã‚µã‚·ã‚¹ã‚»ã‚½ã‚¿ãƒãƒ„ãƒ†ãƒˆãƒŠãƒ‹ãƒŒãƒãƒŽ';
         const FONT_SIZE = 14;
         let cols = Math.floor(canvas.width / FONT_SIZE);
         const drops: number[] = Array(cols).fill(1);
@@ -157,10 +157,19 @@ const MatrixRain: React.FC = () => {
 
 export const LoginScreen: React.FC<LoginScreenProps> = () => {
     const { login, register } = useAuth();
-    // Show registration on first visit, login on return visits
-    const [isRegistering, setIsRegistering] = useState(!localStorage.getItem('scam_registered'));
-    // Auto-fill last logged-in username for returning users
-    const [username, setUsername] = useState(localStorage.getItem('scam_last_user') || '');
+
+    const lastUser = localStorage.getItem('scam_last_user');
+    const hasRegistered = localStorage.getItem('scam_registered');
+
+    type Mode = 'register' | 'biometric' | 'password';
+    const getInitialMode = (): Mode => {
+        if (!hasRegistered) return 'register';
+        if (lastUser) return 'biometric';
+        return 'password';
+    };
+
+    const [mode, setMode] = useState<Mode>(getInitialMode);
+    const [username, setUsername] = useState(lastUser || '');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -168,112 +177,33 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
     const [error, setError] = useState<string | null>(null);
     const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
-    // Auto-trigger biometric on page load for returning users (no button needed)
+    // â”€â”€ Biometric mode: auto-trigger on page load â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     useEffect(() => {
-        const lastUser = localStorage.getItem('scam_last_user');
-        const hasRegistered = localStorage.getItem('scam_registered');
-        if (!isRegistering && lastUser && hasRegistered && window.PublicKeyCredential) {
-            // Small delay so the UI renders first
-            setTimeout(() => handleBiometricLogin(lastUser), 800);
+        if (mode === 'biometric' && lastUser && window.PublicKeyCredential) {
+            setTimeout(() => triggerBiometric(lastUser), 700);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError(null);
-        setStatusMsg(null);
-
-        if (!username.trim() || !password.trim()) {
-            setError('CREDENTIALS REQUIRED');
-            return;
-        }
-
-        if (isRegistering && password !== confirmPassword) {
-            setError('PASSWORDS DO NOT MATCH');
-            return;
-        }
-
-        setIsLoading(true);
-
-        try {
-            if (isRegistering) {
-                const success = await register(username, password);
-                if (!success) {
-                    setError('OPERATOR ID ALREADY TAKEN');
-                } else {
-                    // Auto-enroll biometrics right after password registration
-                    if (window.PublicKeyCredential) {
-                        try {
-                            setStatusMsg('ENROLLING BIOMETRICS — FOLLOW THE PROMPT...');
-                            await enrollBiometrics(username);
-                            setStatusMsg('BIOMETRICS ENROLLED ✓ — PLEASE LOG IN');
-                        } catch (bioErr: any) {
-                            // Don't block them — biometric enrollment is optional
-                            console.warn('Biometric enrollment skipped:', bioErr.message);
-                            setStatusMsg('ACCOUNT CREATED — BIOMETRICS SKIPPED');
-                        }
-                    } else {
-                        setStatusMsg('ACCOUNT CREATED — BROWSER DOES NOT SUPPORT BIOMETRICS');
-                    }
-                    localStorage.setItem('scam_registered', 'true');
-                    setIsRegistering(false);
-                    setPassword('');
-                }
-            } else {
-                const success = await login(username, password);
-                if (!success) {
-                    setError('ACCESS DENIED: INVALID CREDENTIALS');
-                } else {
-                    // Remember username so auto-biometric can trigger next visit
-                    localStorage.setItem('scam_last_user', username);
-                }
-            }
-        } catch (err) {
-            setError('SYSTEM ERROR: AUTHENTICATION FAILED');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleBiometricLogin = async (usernameOverride?: string) => {
-        const activeUser = usernameOverride || username;
-        if (!activeUser.trim()) {
-            setError('ENTER OPERATOR ID FOR BIOMETRICS');
-            return;
-        }
-
-        if (!window.PublicKeyCredential) {
-            setError('BIOMETRICS NOT SUPPORTED ON THIS BROWSER');
-            return;
-        }
-
+    const triggerBiometric = async (user: string) => {
         setIsLoading(true);
         setError(null);
-        setStatusMsg('PROMPTING BIOMETRIC SCANNER...');
-
+        setStatusMsg('SCANNING BIOMETRICS...');
         try {
-            // 1. Get authentication challenge from backend
             const startRes = await fetch(
-                `${API_BASE_URL}/api/auth/biometric/login/start?username=${encodeURIComponent(activeUser)}`,
+                `${API_BASE_URL}/api/auth/biometric/login/start?username=${encodeURIComponent(user)}`,
                 { method: 'POST' }
             );
-            if (!startRes.ok) {
-                const errData = await startRes.json().catch(() => ({}));
-                throw new Error(errData.detail || 'Failed to start biometric login');
-            }
+            if (!startRes.ok) throw new Error('biometric_start_failed');
             const rawOptions = await startRes.json();
             const requestOptions = prepareAuthenticationOptions(rawOptions);
 
-            // 2. Trigger real OS biometric prompt
             const assertion = await navigator.credentials.get({ publicKey: requestOptions }) as PublicKeyCredential;
-            if (!assertion) throw new Error('No assertion returned');
+            if (!assertion) throw new Error('no_assertion');
 
             const assResponse = assertion.response as AuthenticatorAssertionResponse;
-
-            // 3. Send to backend for signature verification
             const finishRes = await fetch(
-                `${API_BASE_URL}/api/auth/biometric/login/finish?username=${encodeURIComponent(activeUser)}`,
+                `${API_BASE_URL}/api/auth/biometric/login/finish?username=${encodeURIComponent(user)}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -290,368 +220,253 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                     }),
                 }
             );
-
             const data = await finishRes.json();
             if (finishRes.ok && data.token) {
                 localStorage.setItem('token', data.token);
-                localStorage.setItem('scam_last_user', activeUser);
+                localStorage.setItem('scam_last_user', user);
                 window.location.reload();
             } else {
-                throw new Error(data.detail || 'Biometric verification failed');
+                throw new Error(data.detail || 'verification_failed');
             }
         } catch (e: any) {
-            console.error(e);
-            if (e.name === 'NotAllowedError') {
-                setError('BIOMETRIC SCAN CANCELLED OR TIMED OUT');
-            } else if (e.name === 'InvalidStateError') {
-                setError('NO BIOMETRIC REGISTERED — USE PASSWORD LOGIN');
-            } else {
-                setError(e.message?.toUpperCase() || 'BIOMETRICS UNAVAILABLE');
-            }
+            // Silently fall back to password mode â€” don't show an error
+            setMode('password');
             setStatusMsg(null);
+            setError(null);
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleEnrollBiometrics = async () => {
-        if (!username.trim() || !password.trim()) {
-            setError('ENTER OPERATOR ID AND ACCESS CODE TO ENROLL BIOMETRICS');
-            return;
-        }
-        if (!window.PublicKeyCredential) {
-            setError('BIOMETRICS NOT SUPPORTED ON THIS BROWSER');
-            return;
-        }
-
-        setIsLoading(true);
+    // â”€â”€ Registration submit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const handleRegister = async (e: React.FormEvent) => {
+        e.preventDefault();
         setError(null);
-        setStatusMsg('VERIFYING CREDENTIALS...');
-
+        if (!username.trim() || !password.trim()) { setError('ALL FIELDS REQUIRED'); return; }
+        if (password !== confirmPassword) { setError('PASSWORDS DO NOT MATCH'); return; }
+        setIsLoading(true);
         try {
-            // 1. Verify password — only account owner can enroll biometrics
-            const verifyRes = await fetch(`${API_BASE_URL}/api/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password }),
-            });
-            if (!verifyRes.ok) {
-                throw new Error('INVALID CREDENTIALS — CANNOT ENROLL BIOMETRICS');
-            }
-
-            // 2. Trigger Windows Hello enrollment
-            setStatusMsg('FOLLOW THE WINDOWS HELLO PROMPT TO ENROLL...');
-            await enrollBiometrics(username);
-            setStatusMsg('BIOMETRICS ENROLLED ✓ — USE FACE ID / TOUCH ID TO LOGIN');
-        } catch (e: any) {
-            if (e.name === 'NotAllowedError') {
-                setError('BIOMETRIC SCAN CANCELLED');
+            const success = await register(username, password);
+            if (!success) {
+                setError('OPERATOR ID ALREADY TAKEN â€” CHOOSE ANOTHER');
             } else {
-                setError(e.message?.toUpperCase() || 'ENROLLMENT FAILED');
+                // Registration auto-logs in. Now try biometric enrollment.
+                localStorage.setItem('scam_registered', 'true');
+                localStorage.setItem('scam_last_user', username);
+                if (window.PublicKeyCredential) {
+                    try {
+                        setStatusMsg('SETTING UP BIOMETRICS â€” FOLLOW DEVICE PROMPT...');
+                        await enrollBiometrics(username);
+                        setStatusMsg('âœ“ BIOMETRICS ENROLLED â€” WELCOME!');
+                    } catch {
+                        setStatusMsg('âœ“ ACCOUNT CREATED â€” BIOMETRICS SKIPPED');
+                    }
+                }
+                // App will unmount this component since user is now logged in
             }
-            setStatusMsg(null);
+        } catch {
+            setError('REGISTRATION FAILED â€” TRY AGAIN');
         } finally {
             setIsLoading(false);
         }
     };
+
+    // â”€â”€ Password login submit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const handlePasswordLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError(null);
+        if (!username.trim() || !password.trim()) { setError('CREDENTIALS REQUIRED'); return; }
+        setIsLoading(true);
+        try {
+            const success = await login(username, password);
+            if (!success) {
+                setError('ACCESS DENIED: INVALID CREDENTIALS');
+            } else {
+                localStorage.setItem('scam_last_user', username);
+            }
+        } catch {
+            setError('SYSTEM ERROR â€” TRY AGAIN');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // â”€â”€ Shared card wrapper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const cardStyle: React.CSSProperties = {
+        width: '400px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto',
+        padding: '2.5rem',
+        background: 'rgba(15, 23, 42, 0.85)',
+        border: '1px solid rgba(16, 185, 129, 0.25)',
+        borderRadius: '16px',
+        boxShadow: '0 0 60px rgba(16, 185, 129, 0.08)',
+        position: 'relative', zIndex: 10,
+        backdropFilter: 'blur(12px)',
+    };
+    const inputStyle: React.CSSProperties = {
+        width: '100%', padding: '12px 12px 12px 40px',
+        background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: '8px', color: '#fff', fontFamily: 'Inter, sans-serif',
+        outline: 'none', fontSize: '0.9rem',
+    };
+    const btnPrimary: React.CSSProperties = {
+        width: '100%', padding: '13px', background: '#10b981', color: '#000',
+        border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: '0.5rem', fontSize: '0.9rem', marginTop: '0.5rem',
+    };
+    const btnGhost: React.CSSProperties = {
+        width: '100%', padding: '10px', background: 'none',
+        border: '1px solid rgba(16,185,129,0.35)', color: '#10b981',
+        borderRadius: '8px', fontWeight: 600, cursor: 'pointer',
+        fontSize: '0.8rem', marginTop: '0.75rem', letterSpacing: '0.5px',
+    };
+
+    const Header = ({ subtitle }: { subtitle: string }) => (
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <div style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: '64px', height: '64px', borderRadius: '50%',
+                background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)',
+                marginBottom: '1rem'
+            }}>
+                <ShieldCheck size={32} color="#10b981" />
+            </div>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0, color: '#fff' }}>
+                SCAM<span style={{ color: '#10b981' }}>DEFENDER</span>
+            </h1>
+            <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.5rem', letterSpacing: '1px' }}>
+                {subtitle}
+            </p>
+        </div>
+    );
+
+    const StatusBar = () => (
+        <>
+            {statusMsg && (
+                <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#6ee7b7', padding: '0.75rem', borderRadius: '8px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                    <ShieldCheck size={16} /> {statusMsg}
+                </div>
+            )}
+            {error && (
+                <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#fca5a5', padding: '0.75rem', borderRadius: '8px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                    <AlertTriangle size={16} /> {error}
+                </div>
+            )}
+        </>
+    );
 
     return (
-        <div className="login-container" style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'center',
-            minHeight: '100vh',
-            background: '#0f172a',
-            color: '#e0e0e0',
-            fontFamily: 'monospace',
-            position: 'relative',
-            overflowY: 'auto',
-            paddingTop: '2rem',
-            paddingBottom: '2rem',
-        }}>
-            {/* Matrix Digital Rain Background */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', minHeight: '100vh', background: '#0f172a', color: '#e0e0e0', fontFamily: 'monospace', position: 'relative', overflowY: 'auto', paddingTop: '2rem', paddingBottom: '2rem' }}>
             <MatrixRain />
 
-            <div className="login-card" style={{
-                width: '400px',
-                maxWidth: '95vw',
-                maxHeight: '90vh',
-                overflowY: 'auto',
-                padding: '2.5rem',
-                background: 'rgba(30, 41, 59, 0.9)',
-                border: '1px solid rgba(16, 185, 129, 0.2)',
-                borderRadius: '16px',
-                boxShadow: '0 0 40px rgba(0, 0, 0, 0.5)',
-                position: 'relative',
-                zIndex: 10,
-                backdropFilter: 'blur(10px)'
-            }}>
-                <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                    <div style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '64px',
-                        height: '64px',
-                        borderRadius: '50%',
-                        background: 'rgba(16, 185, 129, 0.1)',
-                        marginBottom: '1rem',
-                        border: '1px solid rgba(16, 185, 129, 0.3)'
-                    }}>
-                        <ShieldCheck size={32} color="#10b981" />
-                    </div>
-                    <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: '0', letterSpacing: '-0.5px', color: '#fff' }}>
-                        SCAM<span style={{ color: '#10b981' }}>DEFENDER</span>
-                    </h1>
-                    <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.5rem', letterSpacing: '1px' }}>
-                        {isRegistering ? 'NEW OPERATOR ENROLLMENT' : 'AUTHORIZED PERSONNEL ONLY'}
-                    </p>
-                </div>
-
-                <form onSubmit={handleSubmit}>
-                    <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>
-                            {isRegistering ? 'CREATE OPERATOR ID' : 'OPERATOR ID'}
-                        </label>
-                        <div style={{ position: 'relative' }}>
-                            <input
-                                type="text"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 12px 12px 40px',
-                                    background: 'rgba(0, 0, 0, 0.3)',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                                    borderRadius: '8px',
-                                    color: '#fff',
-                                    fontFamily: 'Inter, sans-serif',
-                                    outline: 'none',
-                                    fontSize: '0.9rem'
-                                }}
-                                placeholder="Enter ID..."
-                            />
-                            <Fingerprint size={18} color="#64748b" style={{ position: 'absolute', left: '12px', top: '12px' }} />
-                        </div>
-                    </div>
-
-                    <div className="form-group" style={{ marginBottom: '2rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>
-                            {isRegistering ? 'CREATE ACCESS CODE' : 'ACCESS CODE'}
-                        </label>
-                        <div style={{ position: 'relative' }}>
-                            <input
-                                type={showPassword ? 'text' : 'password'}
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 40px 12px 40px',
-                                    background: 'rgba(0, 0, 0, 0.3)',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                                    borderRadius: '8px',
-                                    color: '#fff',
-                                    fontFamily: 'Inter, sans-serif',
-                                    outline: 'none',
-                                    fontSize: '0.9rem'
-                                }}
-                                placeholder="••••••••"
-                            />
-                            <Lock size={18} color="#64748b" style={{ position: 'absolute', left: '12px', top: '12px' }} />
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                style={{
-                                    position: 'absolute',
-                                    right: '12px',
-                                    top: '12px',
-                                    background: 'none',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    color: '#64748b',
-                                    padding: 0
-                                }}
-                            >
-                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                            </button>
-                        </div>
-                    </div>
-
-                    {isRegistering && (
-                        <div className="form-group" style={{ marginBottom: '2rem' }}>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>
-                                CONFIRM ACCESS CODE
-                            </label>
+            {/* â”€â”€ MODE: REGISTER â”€â”€ */}
+            {mode === 'register' && (
+                <div style={cardStyle}>
+                    <Header subtitle="NEW OPERATOR ENROLLMENT" />
+                    <form onSubmit={handleRegister}>
+                        <div style={{ marginBottom: '1.2rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>CREATE OPERATOR ID</label>
                             <div style={{ position: 'relative' }}>
-                                <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    style={{
-                                        width: '100%',
-                                        padding: '12px 12px 12px 40px',
-                                        background: 'rgba(0, 0, 0, 0.3)',
-                                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                                        borderRadius: '8px',
-                                        color: '#fff',
-                                        fontFamily: 'Inter, sans-serif',
-                                        outline: 'none',
-                                        fontSize: '0.9rem'
-                                    }}
-                                    placeholder="••••••••"
-                                />
-                                <ShieldCheck size={18} color="#64748b" style={{ position: 'absolute', left: '12px', top: '12px' }} />
+                                <input type="text" value={username} onChange={e => setUsername(e.target.value)} style={inputStyle} placeholder="Choose a username..." />
+                                <Fingerprint size={18} color="#64748b" style={{ position: 'absolute', left: 12, top: 12 }} />
                             </div>
                         </div>
-                    )}
-
-                    {statusMsg && (
-                        <div style={{
-                            background: 'rgba(16, 185, 129, 0.1)',
-                            border: '1px solid rgba(16, 185, 129, 0.3)',
-                            color: '#6ee7b7',
-                            padding: '0.75rem',
-                            borderRadius: '8px',
-                            fontSize: '0.8rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.5rem',
-                            marginBottom: '1rem',
-                            letterSpacing: '0.5px'
-                        }}>
-                            <ShieldCheck size={16} /> {statusMsg}
+                        <div style={{ marginBottom: '1.2rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>CREATE ACCESS CODE</label>
+                            <div style={{ position: 'relative' }}>
+                                <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} style={{ ...inputStyle, paddingRight: 40 }} placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" />
+                                <Lock size={18} color="#64748b" style={{ position: 'absolute', left: 12, top: 12 }} />
+                                <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: 12, top: 12, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 0 }}>
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
                         </div>
-                    )}
-
-                    {error && (
-                        <div style={{
-                            background: 'rgba(239, 68, 68, 0.1)',
-                            border: '1px solid rgba(239, 68, 68, 0.2)',
-                            color: '#fca5a5',
-                            padding: '0.75rem',
-                            borderRadius: '8px',
-                            fontSize: '0.8rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.5rem',
-                            marginBottom: '1.5rem'
-                        }}>
-                            <AlertTriangle size={16} /> {error}
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>CONFIRM ACCESS CODE</label>
+                            <div style={{ position: 'relative' }}>
+                                <input type={showPassword ? 'text' : 'password'} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={inputStyle} placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" />
+                                <ShieldCheck size={18} color="#64748b" style={{ position: 'absolute', left: 12, top: 12 }} />
+                            </div>
                         </div>
-                    )}
+                        <StatusBar />
+                        <button type="submit" disabled={isLoading} style={{ ...btnPrimary, background: isLoading ? '#334155' : '#10b981', color: isLoading ? '#94a3b8' : '#000', cursor: isLoading ? 'not-allowed' : 'pointer' }}>
+                            {isLoading ? <span>CREATING ACCOUNT...</span> : <><UserPlus size={18} /><span>CREATE ACCOUNT &amp; SETUP BIOMETRICS</span></>}
+                        </button>
+                    </form>
+                </div>
+            )}
 
-                    <button
-                        type="submit"
-                        disabled={isLoading}
-                        style={{
-                            width: '100%',
-                            padding: '12px',
-                            background: isLoading ? '#334155' : '#10b981',
-                            color: isLoading ? '#94a3b8' : '#000',
-                            border: 'none',
-                            borderRadius: '8px',
-                            fontWeight: 700,
-                            cursor: isLoading ? 'not-allowed' : 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.5rem',
-                            transition: 'all 0.2s',
-                            fontSize: '0.9rem'
-                        }}
-                    >
-                        {isLoading ? (
-                            <span>VERIFYING...</span>
-                        ) : (
-                            <>
-                                {isRegistering ? <UserPlus size={18} /> : <Lock size={18} />}
-                                <span>{isRegistering ? 'ENROLL OPERATOR' : 'AUTHENTICATE'}</span>
-                            </>
+            {/* â”€â”€ MODE: BIOMETRIC (auto-scanning) â”€â”€ */}
+            {mode === 'biometric' && (
+                <div style={cardStyle}>
+                    <Header subtitle="BIOMETRIC VERIFICATION" />
+                    <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+                        <div style={{ fontSize: '4rem', marginBottom: '1rem', animation: 'pulse 1.5s infinite' }}>
+                            <ScanFace size={72} color="#10b981" style={{ margin: '0 auto', display: 'block' }} />
+                        </div>
+                        <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                            WELCOME BACK
+                        </p>
+                        <p style={{ color: '#fff', fontSize: '1.1rem', fontWeight: 700, letterSpacing: '1px', marginBottom: '1.5rem' }}>
+                            {username.toUpperCase()}
+                        </p>
+                        {isLoading && (
+                            <p style={{ color: '#10b981', fontSize: '0.8rem', letterSpacing: '1px' }}>
+                                {statusMsg || 'WAITING FOR BIOMETRIC...'}
+                            </p>
                         )}
-                    </button>
-
-                    {/* Register / Login toggle — placed prominently right after main button */}
-                    <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-                        <button
-                            type="button"
-                            onClick={() => { setIsRegistering(!isRegistering); setError(null); }}
-                            style={{
-                                background: 'none',
-                                border: '1px solid rgba(16, 185, 129, 0.4)',
-                                borderRadius: '8px',
-                                color: '#10b981',
-                                fontSize: '0.82rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                padding: '8px 16px',
-                                width: '100%',
-                                letterSpacing: '0.5px'
-                            }}
-                        >
-                            {isRegistering ? '← ALREADY HAVE AN ACCOUNT? LOGIN' : 'NEW USER? CREATE YOUR ACCOUNT →'}
+                        {!isLoading && (
+                            <button type="button" onClick={() => triggerBiometric(username)} style={btnPrimary}>
+                                <ScanFace size={18} /><span>SCAN FINGERPRINT / FACE ID</span>
+                            </button>
+                        )}
+                        <button type="button" onClick={() => { setMode('password'); setError(null); }} style={btnGhost}>
+                            USE PASSWORD INSTEAD
+                        </button>
+                        <button type="button" onClick={() => { localStorage.removeItem('scam_last_user'); localStorage.removeItem('scam_registered'); setMode('register'); }} style={{ ...btnGhost, color: '#64748b', border: '1px solid rgba(100,116,139,0.3)', marginTop: '0.4rem', fontSize: '0.75rem' }}>
+                            NOT {username.toUpperCase()}? SWITCH ACCOUNT
                         </button>
                     </div>
+                </div>
+            )}
 
-                    {!isRegistering && (
-                        <button
-                            type="button"
-                            onClick={() => handleBiometricLogin()}
-                            disabled={isLoading}
-                            style={{
-                                width: '100%',
-                                padding: '12px',
-                                background: 'transparent',
-                                border: '1px solid rgba(16, 185, 129, 0.3)',
-                                color: '#10b981',
-                                borderRadius: '8px',
-                                fontWeight: 600,
-                                cursor: isLoading ? 'not-allowed' : 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '0.5rem',
-                                transition: 'all 0.2s',
-                                fontSize: '0.9rem',
-                                marginTop: '1rem'
-                            }}
-                        >
-                            <ScanFace size={18} />
-                            <span>FACE ID / TOUCH ID</span>
+            {/* â”€â”€ MODE: PASSWORD â”€â”€ */}
+            {mode === 'password' && (
+                <div style={cardStyle}>
+                    <Header subtitle="AUTHORIZED PERSONNEL ONLY" />
+                    <form onSubmit={handlePasswordLogin}>
+                        <div style={{ marginBottom: '1.2rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>OPERATOR ID</label>
+                            <div style={{ position: 'relative' }}>
+                                <input type="text" value={username} onChange={e => setUsername(e.target.value)} style={inputStyle} placeholder="Enter ID..." />
+                                <Fingerprint size={18} color="#64748b" style={{ position: 'absolute', left: 12, top: 12 }} />
+                            </div>
+                        </div>
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>ACCESS CODE</label>
+                            <div style={{ position: 'relative' }}>
+                                <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} style={{ ...inputStyle, paddingRight: 40 }} placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" />
+                                <Lock size={18} color="#64748b" style={{ position: 'absolute', left: 12, top: 12 }} />
+                                <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: 12, top: 12, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 0 }}>
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
+                        </div>
+                        <StatusBar />
+                        <button type="submit" disabled={isLoading} style={{ ...btnPrimary, background: isLoading ? '#334155' : '#10b981', color: isLoading ? '#94a3b8' : '#000', cursor: isLoading ? 'not-allowed' : 'pointer' }}>
+                            {isLoading ? <span>VERIFYING...</span> : <><Lock size={18} /><span>AUTHENTICATE</span></>}
+                        </button>
+                    </form>
+                    {lastUser && (
+                        <button type="button" onClick={() => { setMode('biometric'); setError(null); triggerBiometric(username); }} style={btnGhost}>
+                            <ScanFace size={16} style={{ display: 'inline', marginRight: 6 }} />TRY BIOMETRICS INSTEAD
                         </button>
                     )}
-
-                    {!isRegistering && (
-                        <button
-                            type="button"
-                            onClick={handleEnrollBiometrics}
-                            disabled={isLoading}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                background: 'transparent',
-                                border: '1px solid rgba(99, 102, 241, 0.4)',
-                                color: '#a5b4fc',
-                                borderRadius: '8px',
-                                fontWeight: 600,
-                                cursor: isLoading ? 'not-allowed' : 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '0.5rem',
-                                transition: 'all 0.2s',
-                                fontSize: '0.8rem',
-                                marginTop: '0.5rem',
-                                letterSpacing: '0.5px'
-                            }}
-                        >
-                            <Fingerprint size={16} />
-                            <span>ENROLL BIOMETRICS FOR THIS ACCOUNT</span>
-                        </button>
-                    )}
-                </form>
-            </div>
+                    <button type="button" onClick={() => { setMode('register'); setError(null); }} style={{ ...btnGhost, color: '#64748b', border: '1px solid rgba(100,116,139,0.3)', marginTop: '0.4rem', fontSize: '0.75rem' }}>
+                        NEW USER? CREATE ACCOUNT â†’
+                    </button>
+                </div>
+            )}
         </div>
     );
 };
