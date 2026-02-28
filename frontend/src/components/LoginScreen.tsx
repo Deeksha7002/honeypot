@@ -57,7 +57,10 @@ async function enrollBiometrics(username: string): Promise<void> {
     // 1. Get registration options from backend
     const startRes = await fetch(
         `${API_BASE_URL}/api/auth/biometric/register/start?username=${encodeURIComponent(username)}`,
-        { method: 'POST' }
+        {
+            method: 'POST',
+            headers: { 'X-Rakshak-Token': 'rakshak-core-v1' }
+        }
     );
     if (!startRes.ok) throw new Error(await startRes.text());
     const rawOptions = await startRes.json();
@@ -74,7 +77,10 @@ async function enrollBiometrics(username: string): Promise<void> {
         `${API_BASE_URL}/api/auth/biometric/register/finish?username=${encodeURIComponent(username)}`,
         {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Rakshak-Token': 'rakshak-core-v1'
+            },
             body: JSON.stringify({
                 id: credential.id,
                 rawId: bufferToBase64url(credential.rawId),
@@ -192,7 +198,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
         try {
             const startRes = await fetch(
                 `${API_BASE_URL}/api/auth/biometric/login/start?username=${encodeURIComponent(user)}`,
-                { method: 'POST' }
+                {
+                    method: 'POST',
+                    headers: { 'X-Rakshak-Token': 'rakshak-core-v1' }
+                }
             );
             if (!startRes.ok) throw new Error('biometric_start_failed');
             const rawOptions = await startRes.json();
@@ -206,7 +215,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                 `${API_BASE_URL}/api/auth/biometric/login/finish?username=${encodeURIComponent(user)}`,
                 {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Rakshak-Token': 'rakshak-core-v1'
+                    },
                     body: JSON.stringify({
                         id: assertion.id,
                         rawId: bufferToBase64url(assertion.rawId),

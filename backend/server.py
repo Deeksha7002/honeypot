@@ -8,6 +8,11 @@ import json
 import os
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from fastapi.responses import JSONResponse
+
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 # Internal Modules
 from analyzer import ScamAnalyzer
@@ -29,8 +34,32 @@ app.add_middleware(
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*", "X-Rakshak-Token"],
 )
+
+# Initialize Rate Limiter
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Enterprise Security Middleware
+@app.middleware("http")
+async def secure_headers_and_obfuscation(request: Request, call_next):
+    # Dead-Drop API Obfuscation (only for /api/ routes)
+    if request.url.path.startswith("/api/"):
+        token = request.headers.get("X-Rakshak-Token")
+        if token != "rakshak-core-v1" and request.method != "OPTIONS":
+            return JSONResponse(status_code=403, content={"detail": "Access Denied: Missing or Invalid Rakshak Security Token"})
+
+    response = await call_next(request)
+    
+    # Vault Door Security Headers
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:;"
+    
+    return response
 
 # Initialize Core Logic
 analyzer = ScamAnalyzer()
@@ -70,7 +99,8 @@ def read_root():
     return {"status": "active", "system": "Cyber Cell Core", "version": "2.0.0 (Fortified)"}
 
 @app.post("/api/analyze")
-def analyze_text(request: AnalysisRequest):
+@limiter.limit("20/minute")
+def analyze_text(request: AnalysisRequest, req: Request):
     """
     Performs deep heuristic analysis on a text snippet.
     """
@@ -101,7 +131,8 @@ def get_or_create_stats(db: Session):
     return stats
 
 @app.get("/api/stats")
-def get_stats(db: Session = Depends(get_db)):
+@limiter.limit("30/minute")
+def get_stats(req: Request, db: Session = Depends(get_db)):
     # Calculate time-based stats dynamically from Cases
     now = datetime.now(timezone.utc)
     day_ago = now - timedelta(days=1)
@@ -164,7 +195,8 @@ def get_stats(db: Session = Depends(get_db)):
 # --- Cases Management ---
 
 @app.get("/api/cases")
-def get_cases(db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+def get_cases(request: Request, db: Session = Depends(get_db)):
     cases = db.query(Case).all()
     # Convert to list of dicts for JSON response
     return [{
@@ -180,7 +212,8 @@ def get_cases(db: Session = Depends(get_db)):
     } for c in cases]
 
 @app.post("/api/report")
-def submit_report(report: ReportRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def submit_report(report: ReportRequest, request: Request, db: Session = Depends(get_db)):
     """
     Receives official scam reports from the frontend honeypot.
     """
@@ -218,7 +251,8 @@ def submit_report(report: ReportRequest, db: Session = Depends(get_db)):
 # --- Authentication ---
 
 @app.post("/api/login")
-def login(creds: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def login(creds: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == creds.username).first()
     
     # If user doesn't exist in DB, look them up in users.json to auto-create
@@ -248,7 +282,8 @@ def login(creds: LoginRequest, db: Session = Depends(get_db)):
     return {"status": "success", "token": access_token}
 
 @app.post("/api/register")
-def register(creds: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register(creds: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == creds.username).first()
     if user:
         raise HTTPException(status_code=400, detail="Operator ID already exists")
@@ -307,6 +342,7 @@ RP_NAME = "Rakshak AI"
 challenges = {} 
 
 @app.post("/api/auth/biometric/register/start")
+@limiter.limit("5/minute")
 def register_bio_start(username: str, request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == username).first()
     if not user:
@@ -331,6 +367,7 @@ def register_bio_start(username: str, request: Request, db: Session = Depends(ge
     return json.loads(options_to_json(options))
 
 @app.post("/api/auth/biometric/register/finish")
+@limiter.limit("5/minute")
 def register_bio_finish(response: Dict[str, Any], username: str, request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == username).first()
     if not user:
@@ -379,6 +416,7 @@ def register_bio_finish(response: Dict[str, Any], username: str, request: Reques
         raise HTTPException(status_code=400, detail=f"Registration failed: {str(e)}")
 
 @app.post("/api/auth/biometric/login/start")
+@limiter.limit("5/minute")
 def login_bio_start(username: str, request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == username).first()
     if not user:
@@ -408,6 +446,7 @@ def login_bio_start(username: str, request: Request, db: Session = Depends(get_d
     return json.loads(options_to_json(options))
 
 @app.post("/api/auth/biometric/login/finish")
+@limiter.limit("5/minute")
 def login_bio_finish(response: Dict[str, Any], username: str, request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == username).first()
     if not user:

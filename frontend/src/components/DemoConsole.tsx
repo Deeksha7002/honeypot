@@ -16,7 +16,10 @@ export const DemoConsole: React.FC = () => {
         try {
             const res = await fetch(`${API_BASE_URL}/api/analyze`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Rakshak-Token': 'rakshak-core-v1'
+                },
                 body: JSON.stringify({ text: input })
             });
 

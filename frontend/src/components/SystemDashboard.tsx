@@ -27,7 +27,9 @@ export const SystemDashboard: React.FC<SystemDashboardProps> = ({ activeThreats 
 
     const fetchStats = async () => {
         try {
-            const res = await fetch(`${API_BASE_URL}/api/stats`);
+            const res = await fetch(`${API_BASE_URL}/api/stats`, {
+                headers: { 'X-Rakshak-Token': 'rakshak-core-v1' }
+            });
             if (res.ok) {
                 const data = await res.json();
                 const activeReports = data.reports_filed || 0;

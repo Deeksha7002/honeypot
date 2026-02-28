@@ -17,7 +17,11 @@ export class IntelligenceService {
 
     static async syncWithBackend(): Promise<void> {
         try {
-            const res = await fetch(`${API_BASE_URL}/api/stats`);
+            const res = await fetch(`${API_BASE_URL}/api/stats`, {
+                headers: {
+                    'X-Rakshak-Token': 'rakshak-core-v1'
+                }
+            });
             if (res.ok) {
                 this.backendStats = await res.json();
                 console.log('[IntelligenceService] 📊 Synced stats from backend:', this.backendStats);

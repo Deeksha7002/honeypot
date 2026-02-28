@@ -14,3 +14,4 @@ bcrypt
 psycopg2-binary
 textblob
 nltk
+slowapi
