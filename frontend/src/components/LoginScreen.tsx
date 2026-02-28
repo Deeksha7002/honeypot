@@ -248,7 +248,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
         try {
             const success = await register(username, password);
             if (!success) {
-                setError('OPERATOR ID ALREADY TAKEN â€” CHOOSE ANOTHER');
+                setError('OPERATOR ID ALREADY TAKEN - CHOOSE ANOTHER');
             } else {
                 // Registration auto-logs in. Now try biometric enrollment.
                 localStorage.setItem('scam_registered', 'true');
