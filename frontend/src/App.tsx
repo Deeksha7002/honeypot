@@ -12,7 +12,7 @@ import { IntelligenceReport } from './components/IntelligenceReport';
 import { soundManager } from './lib/SoundManager';
 import { GeoTracer } from './lib/GeoTracer';
 import { DemoConsole } from './components/DemoConsole';
-import { Play, Database, Volume2, VolumeX, ShieldAlert, LogOut, BarChart3, ScanEye, Shield, Zap } from 'lucide-react';
+import { Play, Database, Volume2, VolumeX, ShieldAlert, LogOut, BarChart3, ScanEye, Shield, Zap, ChevronLeft } from 'lucide-react';
 import { DeepfakeAnalyzer } from './components/DeepfakeAnalyzer';
 import { ForensicsService } from './lib/ForensicsService';
 import { MediaLogService } from './lib/MediaLogService';
@@ -416,7 +416,7 @@ function App() {
         </div>
       )}
 
-      <div className="messenger-container">
+      <div className="messenger-container" data-mobile-view={selectedThreadId ? 'chat' : 'list'}>
         {/* Sidebar */}
         <div className="sidebar">
           <InboxList
@@ -520,9 +520,27 @@ function App() {
                 selectedThread.classification === 'scam' || selectedThread.classification === 'likely_scam' ? 'scam' :
                   selectedThread.classification === 'benign' ? 'safe' : 'neutral'
               }>
-                <div>
-                  <div className="sender-name">{selectedThread.senderName}</div>
-                  <div className="sender-source">{selectedThread.source}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <button
+                    className="mobile-back-btn"
+                    onClick={() => { setSelectedThreadId(null); setActiveView('DASHBOARD'); }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'inherit',
+                      padding: '4px',
+                      cursor: 'pointer',
+                      display: 'none', // Default hidden, shown via media query in index.css
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <ChevronLeft size={24} />
+                  </button>
+                  <div>
+                    <div className="sender-name">{selectedThread.senderName}</div>
+                    <div className="sender-source">{selectedThread.source}</div>
+                  </div>
                 </div>
                 <div>
                   {selectedThread.isScanning && <span className="status-scanning">Scanning...</span>}

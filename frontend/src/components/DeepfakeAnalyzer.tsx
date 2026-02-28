@@ -97,8 +97,8 @@ export const DeepfakeAnalyzer: React.FC = () => {
     };
 
     return (
-        <div style={{ padding: '2rem', color: '#e2e8f0', height: '100%', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1.5rem' }}>
+        <div className="forensics-container" style={{ padding: '2rem', color: '#e2e8f0', height: '100%', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1.5rem' }}>
                 <div style={{ background: 'var(--primary)', padding: '12px', borderRadius: '8px' }}>
                     <Shield size={24} color="#000" />
                 </div>
@@ -129,7 +129,7 @@ export const DeepfakeAnalyzer: React.FC = () => {
             </div>
 
             {view === 'LAB' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 1.5fr', gap: '2rem' }}>
+                <div className="lab-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 1.5fr', gap: '2rem' }}>
                     {/* Controls & Upload */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                         <div className="sys-card" style={{ padding: '1.5rem' }}>
@@ -265,7 +265,7 @@ export const DeepfakeAnalyzer: React.FC = () => {
                                 </div>
 
                                 {/* GENERALIZATION & ANOMALY METERS */}
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <div className="analysis-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                     <div>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
                                             <span style={{ fontSize: '0.7rem', color: '#cbd5e1', fontWeight: 600 }}>GENERALIZATION CONFIDENCE</span>
@@ -353,7 +353,7 @@ export const DeepfakeAnalyzer: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                <div className="analysis-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                                     <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: '8px', borderLeft: '3px solid var(--primary)' }}>
                                         <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.85rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                             <Zap size={14} /> KEY FINDINGS
@@ -417,7 +417,7 @@ export const DeepfakeAnalyzer: React.FC = () => {
 
             {view === 'LOGS' && (
                 <div className="sys-card" style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 1fr 1.5fr 1fr 1fr', gap: '1rem', padding: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', fontSize: '0.7rem', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                    <div className="logs-grid logs-grid-header" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 1fr 1.5fr 1fr 1fr', gap: '1rem', padding: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', fontSize: '0.7rem', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>
                         <span>Sender ID</span>
                         <span>Media Type</span>
                         <span>Confidence</span>
@@ -433,7 +433,7 @@ export const DeepfakeAnalyzer: React.FC = () => {
                         </div>
                     )}
                     {logs.map(log => (
-                        <div key={log.id} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 1fr 1.5fr 1fr 1fr', gap: '1rem', padding: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.85rem', alignItems: 'center', background: log.action === 'BLOCKED' ? 'rgba(239, 68, 68, 0.05)' : 'transparent' }}>
+                        <div key={log.id} className="logs-grid" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 1fr 1.5fr 1fr 1fr', gap: '1rem', padding: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.85rem', alignItems: 'center', background: log.action === 'BLOCKED' ? 'rgba(239, 68, 68, 0.05)' : 'transparent' }}>
                             <span style={{ fontFamily: 'monospace', color: 'var(--primary)', fontSize: '0.75rem' }}>{log.senderId}</span>
                             <span>{log.mediaType}</span>
                             <span style={{ color: log.confidence === 'High' ? '#10b981' : '#f59e0b' }}>{log.confidence}</span>
@@ -456,8 +456,8 @@ export const DeepfakeAnalyzer: React.FC = () => {
             )}
 
             {view === 'SECURITY' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
+                <div className="analysis-grid" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="analysis-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
                         <div className="sys-card" style={{ padding: '1.5rem', borderLeft: '4px solid #10b981' }}>
                             <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#10b981', margin: '0 0 1rem 0', fontSize: '0.9rem' }}>
                                 <Cpu size={18} /> ZERO-PERSISTENCE
@@ -497,7 +497,7 @@ export const DeepfakeAnalyzer: React.FC = () => {
 
                     <div style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                         <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: '#94a3b8' }}>DATA GOVERANCE POLICY</h4>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem', fontSize: '0.8rem', color: '#64748b' }}>
+                        <div className="analysis-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem', fontSize: '0.8rem', color: '#64748b' }}>
                             <div>
                                 <p style={{ fontWeight: 'bold', color: '#e2e8f0', marginBottom: '4px' }}>LOCAL PROCESSING</p>
                                 <p>All deepfake analysis and persona orchestration happens on your local client. We use zero server-side storage for raw signals.</p>
