@@ -408,6 +408,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                             {isLoading ? <span>CREATING ACCOUNT...</span> : <><UserPlus size={18} /><span>CREATE ACCOUNT &amp; SETUP BIOMETRICS</span></>}
                         </button>
                     </form>
+                    <button type="button" onClick={() => setMode('password')} style={{ ...btnGhost, color: '#475569', border: '1px solid rgba(71,85,105,0.25)', marginTop: '0.75rem', fontSize: '0.75rem' }}>
+                        ALREADY REGISTERED? SWITCH TO LOGIN
+                    </button>
                 </div>
             )}
 
@@ -417,13 +420,24 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                     <Header subtitle="AUTHORIZED PERSONNEL ONLY" />
 
                     {/* Welcome back with username */}
-                    <div style={{ textAlign: 'center', marginBottom: '1.5rem', padding: '0.75rem', background: 'rgba(16,185,129,0.06)', borderRadius: '10px', border: '1px solid rgba(16,185,129,0.15)' }}>
-                        <p style={{ color: '#94a3b8', fontSize: '0.7rem', letterSpacing: '1px', marginBottom: '0.25rem' }}>WELCOME BACK</p>
-                        <p style={{ color: '#10b981', fontSize: '1.1rem', fontWeight: 700, letterSpacing: '2px', margin: 0 }}>{username.toUpperCase()}</p>
-                    </div>
+                    {lastUser && (
+                        <div style={{ textAlign: 'center', marginBottom: '1.5rem', padding: '0.75rem', background: 'rgba(16,185,129,0.06)', borderRadius: '10px', border: '1px solid rgba(16,185,129,0.15)' }}>
+                            <p style={{ color: '#94a3b8', fontSize: '0.7rem', letterSpacing: '1px', marginBottom: '0.25rem' }}>WELCOME BACK</p>
+                            <p style={{ color: '#10b981', fontSize: '1.1rem', fontWeight: 700, letterSpacing: '2px', margin: 0 }}>{username.toUpperCase()}</p>
+                        </div>
+                    )}
 
                     {/* Password form */}
                     <form onSubmit={handlePasswordLogin}>
+                        {!lastUser && (
+                            <div style={{ marginBottom: '1.2rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>OPERATOR ID</label>
+                                <div style={{ position: 'relative' }}>
+                                    <input type="text" value={username} onChange={e => setUsername(e.target.value)} style={inputStyle} placeholder="Enter your username..." />
+                                    <Fingerprint size={18} color="#64748b" style={{ position: 'absolute', left: 12, top: 12 }} />
+                                </div>
+                            </div>
+                        )}
                         <div style={{ marginBottom: '1.2rem' }}>
                             <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>ACCESS CODE</label>
                             <div style={{ position: 'relative' }}>
