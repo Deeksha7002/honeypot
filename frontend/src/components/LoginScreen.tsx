@@ -563,7 +563,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                             textDecoration: 'none'
                         }}
                     >
-                        {isRegistering ? 'ALREADY HAVE AN ACCOUNT? LOGIN' : 'NEW OPERATOR? ENROLL DEVICE'}
+                        {isRegistering ? 'ALREADY HAVE AN ACCOUNT? LOGIN' : 'NEW USER? CREATE YOUR ACCOUNT →'}
                     </button>
                 </div>
             </div>
