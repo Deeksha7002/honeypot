@@ -21,6 +21,31 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - [API] - %(message)
 # Initialize DB tables
 init_db()
 
+# Seed default users on first run (cloud database starts empty)
+def seed_default_users():
+    db = SessionLocal()
+    try:
+        if db.query(User).count() == 0:
+            default_users = [
+                {"username": "deeksha", "password": "deeksha123", "role": "admin"},
+                {"username": "Divyam",  "password": "divyam123",  "role": "operator"},
+            ]
+            for u in default_users:
+                db.add(User(
+                    username=u["username"],
+                    hashed_password=security.get_password_hash(u["password"]),
+                    role=u["role"],
+                    webauthn_credentials=[]
+                ))
+                logging.info(f"[SEED] Created default user: {u['username']}")
+            db.commit()
+    except Exception as e:
+        logging.warning(f"[SEED] Seeding skipped: {e}")
+    finally:
+        db.close()
+
+seed_default_users()
+
 app = FastAPI(title="Honeypot Cyber Cell API")
 
 # Enable CORS for frontend
