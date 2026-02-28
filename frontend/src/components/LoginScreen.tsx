@@ -167,11 +167,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
     const lastUser = localStorage.getItem('scam_last_user');
     const hasRegistered = localStorage.getItem('scam_registered');
 
-    type Mode = 'register' | 'biometric' | 'password';
+    type Mode = 'register' | 'returning';
     const getInitialMode = (): Mode => {
         if (!hasRegistered) return 'register';
-        if (lastUser) return 'biometric';
-        return 'password';
+        return 'returning';
     };
 
     const [mode, setMode] = useState<Mode>(getInitialMode);
@@ -183,13 +182,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
     const [error, setError] = useState<string | null>(null);
     const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
-    // â”€â”€ Biometric mode: auto-trigger on page load â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Biometric auto-trigger on arrival (PhonePe style) ──────────────────
     useEffect(() => {
-        if (mode !== 'register' && lastUser && window.PublicKeyCredential) {
-            setTimeout(() => triggerBiometric(lastUser), 700);
+        if (mode === 'returning' && lastUser && window.PublicKeyCredential) {
+            // Short delay to allow UI to settle before the browser native prompt pops up
+            const timer = setTimeout(() => triggerBiometric(lastUser), 800);
+            return () => clearTimeout(timer);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [mode]);
 
     const triggerBiometric = async (user: string) => {
         setIsLoading(true);
@@ -241,16 +242,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                 throw new Error(data.detail || 'verification_failed');
             }
         } catch (e: any) {
-            // Silently fall back to password mode â€” don't show an error
-            setMode('password');
+            // Seamless fallback: if biometrics fail or cancel, we just stay on the login screen
+            console.log("Biometric auto-prompt skipped or failed:", e);
             setStatusMsg(null);
-            setError(null);
         } finally {
             setIsLoading(false);
         }
     };
 
-    // â”€â”€ Registration submit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Registration submit ─────────────────────────────────────────────────
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
@@ -259,27 +259,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
         setIsLoading(true);
         try {
             await register(username, password);
-            // Registration auto-logs in. Now try biometric enrollment.
             localStorage.setItem('scam_registered', 'true');
             localStorage.setItem('scam_last_user', username);
             if (window.PublicKeyCredential) {
                 try {
-                    setStatusMsg('SETTING UP BIOMETRICS â€” FOLLOW DEVICE PROMPT...');
+                    setStatusMsg('SETTING UP BIOMETRICS — FOLLOW DEVICE PROMPT...');
                     await enrollBiometrics(username);
-                    setStatusMsg('âœ“ BIOMETRICS ENROLLED â€” WELCOME!');
+                    setStatusMsg('✓ BIOMETRICS ENROLLED — WELCOME!');
                 } catch {
-                    setStatusMsg('âœ“ ACCOUNT CREATED â€” BIOMETRICS SKIPPED');
+                    setStatusMsg('✓ ACCOUNT CREATED — BIOMETRICS SKIPPED');
                 }
             }
-            // App will unmount this component since user is now logged in
         } catch (e: any) {
-            setError(e.message || 'REGISTRATION FAILED â€” TRY AGAIN');
+            setError(e.message || 'REGISTRATION FAILED — TRY AGAIN');
         } finally {
             setIsLoading(false);
         }
     };
 
-    // â”€â”€ Password login submit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Password login submit ───────────────────────────────────────────────
     const handlePasswordLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
@@ -293,13 +291,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                 localStorage.setItem('scam_last_user', username);
             }
         } catch {
-            setError('SYSTEM ERROR â€” TRY AGAIN');
+            setError('SYSTEM ERROR — TRY AGAIN');
         } finally {
             setIsLoading(false);
         }
     };
 
-    // â”€â”€ Shared card wrapper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Shared card wrapper ─────────────────────────────────────────────────
     const cardStyle: React.CSSProperties = {
         width: '400px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto',
         padding: '2.5rem',
@@ -370,7 +368,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', minHeight: '100vh', background: '#0f172a', color: '#e0e0e0', fontFamily: 'monospace', position: 'relative', overflowY: 'auto', paddingTop: '2rem', paddingBottom: '2rem' }}>
             <MatrixRain />
 
-            {/* â”€â”€ MODE: REGISTER â”€â”€ */}
+            {/* ── MODE: REGISTER ── */}
             {mode === 'register' && (
                 <div style={cardStyle}>
                     <Header subtitle="NEW OPERATOR ENROLLMENT" />
@@ -385,7 +383,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                         <div style={{ marginBottom: '1.2rem' }}>
                             <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>CREATE ACCESS CODE</label>
                             <div style={{ position: 'relative' }}>
-                                <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} style={{ ...inputStyle, paddingRight: 40 }} placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" />
+                                <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} style={{ ...inputStyle, paddingRight: 40 }} placeholder="••••••••" />
                                 <Lock size={18} color="#64748b" style={{ position: 'absolute', left: 12, top: 12 }} />
                                 <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: 12, top: 12, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 0 }}>
                                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -395,7 +393,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                         <div style={{ marginBottom: '1.5rem' }}>
                             <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>CONFIRM ACCESS CODE</label>
                             <div style={{ position: 'relative' }}>
-                                <input type={showPassword ? 'text' : 'password'} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={inputStyle} placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" />
+                                <input type={showPassword ? 'text' : 'password'} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={inputStyle} placeholder="••••••••" />
                                 <ShieldCheck size={18} color="#64748b" style={{ position: 'absolute', left: 12, top: 12 }} />
                             </div>
                         </div>
@@ -404,40 +402,37 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                             {isLoading ? <span>CREATING ACCOUNT...</span> : <><UserPlus size={18} /><span>CREATE ACCOUNT &amp; SETUP BIOMETRICS</span></>}
                         </button>
                     </form>
-                    <button type="button" onClick={() => setMode('password')} style={{ ...btnGhost, color: '#475569', border: '1px solid rgba(71,85,105,0.25)', marginTop: '0.75rem', fontSize: '0.75rem' }}>
+                    <button type="button" onClick={() => { localStorage.setItem('scam_registered', 'true'); setMode('returning'); }} style={{ ...btnGhost, color: '#475569', border: '1px solid rgba(71,85,105,0.25)', marginTop: '0.75rem', fontSize: '0.75rem' }}>
                         ALREADY REGISTERED? SWITCH TO LOGIN
                     </button>
                 </div>
             )}
 
-            {/* ── RETURNING USER: password + biometric on same screen (PhonePe style) ── */}
-            {(mode === 'biometric' || mode === 'password') && (
+            {/* ── MODE: RETURNING (PhonePe style) ── */}
+            {mode === 'returning' && (
                 <div style={cardStyle}>
                     <Header subtitle="AUTHORIZED PERSONNEL ONLY" />
 
-                    {/* Welcome back with username */}
-                    {lastUser && (
-                        <div style={{ textAlign: 'center', marginBottom: '1.5rem', padding: '0.75rem', background: 'rgba(16,185,129,0.06)', borderRadius: '10px', border: '1px solid rgba(16,185,129,0.15)' }}>
-                            <p style={{ color: '#94a3b8', fontSize: '0.7rem', letterSpacing: '1px', marginBottom: '0.25rem' }}>WELCOME BACK</p>
-                            <p style={{ color: '#10b981', fontSize: '1.1rem', fontWeight: 700, letterSpacing: '2px', margin: 0 }}>{username.toUpperCase()}</p>
+                    {lastUser ? (
+                        <div style={{ textAlign: 'center', marginBottom: '1.5rem', padding: '1rem', background: 'rgba(16,185,129,0.06)', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.15)' }}>
+                            <p style={{ color: '#94a3b8', fontSize: '0.7rem', letterSpacing: '2px', marginBottom: '0.5rem', fontWeight: 600 }}>OPERATOR RECOGNIZED</p>
+                            <p style={{ color: '#10b981', fontSize: '1.25rem', fontWeight: 800, letterSpacing: '3px', margin: 0 }}>{username.toUpperCase()}</p>
+                        </div>
+                    ) : (
+                        <div style={{ marginBottom: '1.2rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>OPERATOR ID</label>
+                            <div style={{ position: 'relative' }}>
+                                <input type="text" value={username} onChange={e => setUsername(e.target.value)} style={inputStyle} placeholder="Enter username..." />
+                                <Fingerprint size={18} color="#64748b" style={{ position: 'absolute', left: 12, top: 12 }} />
+                            </div>
                         </div>
                     )}
 
-                    {/* Password form */}
                     <form onSubmit={handlePasswordLogin}>
-                        {!lastUser && (
-                            <div style={{ marginBottom: '1.2rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>OPERATOR ID</label>
-                                <div style={{ position: 'relative' }}>
-                                    <input type="text" value={username} onChange={e => setUsername(e.target.value)} style={inputStyle} placeholder="Enter your username..." />
-                                    <Fingerprint size={18} color="#64748b" style={{ position: 'absolute', left: 12, top: 12 }} />
-                                </div>
-                            </div>
-                        )}
                         <div style={{ marginBottom: '1.2rem' }}>
                             <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>ACCESS CODE</label>
                             <div style={{ position: 'relative' }}>
-                                <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} style={{ ...inputStyle, paddingRight: 40 }} placeholder="••••••••" autoFocus />
+                                <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} style={{ ...inputStyle, paddingRight: 40 }} placeholder="••••••••" autoFocus={!!lastUser} />
                                 <Lock size={18} color="#64748b" style={{ position: 'absolute', left: 12, top: 12 }} />
                                 <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: 12, top: 12, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 0 }}>
                                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -445,15 +440,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                             </div>
                         </div>
                         <StatusBar />
-                        <button type="submit" disabled={isLoading} style={{ ...btnPrimary, background: isLoading ? '#334155' : '#10b981', color: isLoading ? '#94a3b8' : '#000', cursor: isLoading ? 'not-allowed' : 'pointer' }}>
-                            {isLoading ? <span>VERIFYING...</span> : <><Lock size={18} /><span>AUTHENTICATE</span></>}
+                        <button type="submit" disabled={isLoading} style={{ ...btnPrimary }}>
+                            {isLoading ? <span>AUTHENTICATING...</span> : <><ShieldCheck size={18} /><span>VERIFY &amp; ACCESS</span></>}
                         </button>
                     </form>
 
-                    {/* Switch account */}
-                    <button type="button" onClick={() => { localStorage.removeItem('scam_last_user'); localStorage.removeItem('scam_registered'); setMode('register'); }} style={{ ...btnGhost, color: '#475569', border: '1px solid rgba(71,85,105,0.25)', marginTop: '0.75rem', fontSize: '0.75rem' }}>
-                        NOT {username.toUpperCase()}? SWITCH ACCOUNT
-                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+                        <button type="button" onClick={() => { localStorage.removeItem('scam_last_user'); setUsername(''); }} style={{ ...btnGhost, color: '#64748b', border: 'none', fontSize: '0.7rem' }}>
+                            SWITCH OPERATOR
+                        </button>
+                        <button type="button" onClick={() => { localStorage.removeItem('scam_registered'); setMode('register'); }} style={{ ...btnGhost, color: '#475569', border: '1px solid rgba(71,85,105,0.15)', fontSize: '0.7rem' }}>
+                            NEW ENROLLMENT? CREATE ACCOUNT
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
