@@ -229,6 +229,7 @@ def submit_report(report: ReportRequest, request: Request, db: Session = Depends
     # Update Stats
     stats = get_or_create_stats(db)
     stats.reports_filed += 1
+    stats.scams_detected += 1 # Increment detected counter
     
     scam_type = report.classification.upper()
     current_types = dict(stats.types_json) # Copy to modify

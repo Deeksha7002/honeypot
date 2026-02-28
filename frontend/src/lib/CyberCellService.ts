@@ -78,7 +78,10 @@ export class CyberCellService {
             try {
                 fetch(`${API_BASE_URL}/api/report`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Rakshak-Token': 'rakshak-core-v1'
+                    },
                     body: JSON.stringify(evidenceJson)
                 }).then(res => {
                     if (res.ok) console.log('[CyberCellService] 📡 Backend confirmed receipt.');

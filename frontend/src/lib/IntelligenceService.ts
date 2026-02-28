@@ -39,13 +39,12 @@ export class IntelligenceService {
         const localTodays = this.records.filter(r => now - r.timestamp < oneDay).length;
 
         // Merge with backend stats
-        const backendTotal = this.backendStats?.reports_filed || 0;
         const backendTypes = this.backendStats?.types || {};
 
         const summary: IntelligenceSummary = {
             today: this.backendStats?.today ?? localTodays,
-            week: this.backendStats?.week ?? backendTotal,
-            month: this.backendStats?.month ?? backendTotal,
+            week: this.backendStats?.week ?? this.backendStats?.reports_filed ?? localTodays,
+            month: this.backendStats?.month ?? this.backendStats?.reports_filed ?? localTodays,
             byType: {
                 ROMANCE: (backendTypes['ROMANCE'] || 0),
                 CRYPTO: (backendTypes['CRYPTO'] || 0),
@@ -62,7 +61,7 @@ export class IntelligenceService {
             today_scammers: this.backendStats?.today_scammers,
             week_scammers: this.backendStats?.week_scammers,
             month_scammers: this.backendStats?.month_scammers,
-            uniqueScammers: new Set(this.records.map(r => r.senderName)).size + Math.floor(backendTotal * 0.8),
+            uniqueScammers: this.backendStats?.reports_filed ?? new Set(this.records.map(r => r.senderName)).size,
             repeatedIdentifiers: this.getRepeatedIdentifiers()
         };
 

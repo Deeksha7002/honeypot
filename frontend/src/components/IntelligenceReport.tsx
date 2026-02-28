@@ -60,7 +60,7 @@ export const IntelligenceReport: React.FC = () => {
                 <div className="stat-card">
                     <div className="stat-icon text-red"><ShieldAlert size={18} /></div>
                     <div className="stat-content">
-                        <div className="stat-label">Scam Attempts</div>
+                        <div className="stat-label">Scams Detected</div>
                         <div className="stat-value">{range === 'today' ? summary.today : range === 'week' ? summary.week : summary.month}</div>
                     </div>
                 </div>
