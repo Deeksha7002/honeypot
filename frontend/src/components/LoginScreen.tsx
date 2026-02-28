@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Lock, Fingerprint, EyeOff, Eye, AlertTriangle, UserPlus } from 'lucide-react';
+import { Shield, Cpu, Lock, Fingerprint, EyeOff, Eye, AlertTriangle, UserPlus, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/config';
 import '../index.css';
@@ -329,7 +329,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                 background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)',
                 marginBottom: '1rem'
             }}>
-                <ShieldCheck size={32} color="#10b981" />
+                <div style={{ position: 'relative', width: '32px', height: '32px' }}>
+                    <Shield size={32} color="#10b981" strokeWidth={1.5} />
+                    <Cpu size={14} color="#10b981" style={{ position: 'absolute', top: '10px', left: '9px' }} />
+                </div>
             </div>
             <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0, color: '#fff' }}>
                 RAKSHAK<span style={{ color: '#10b981' }}> AI</span>
