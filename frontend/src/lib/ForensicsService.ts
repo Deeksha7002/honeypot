@@ -82,52 +82,83 @@ export class ForensicsService {
 
     // ── HIGHLY ADVANCED LOGIC: Mathematical Error Level Analysis (ELA) ──
     private static async runPhysicalTensorVariance(file: File, img: HTMLImageElement): Promise<{ elaScore: number, compressionArtifacts: number, metadataVariance: number }> {
-        // Create an off-screen canvas to extract raw RGB tensor matrices
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return { elaScore: 50, compressionArtifacts: 50, metadataVariance: 50 };
-        
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-        
-        // 1. Calculate High-Frequency Noise Variance (Detects GAN/Diffusion artifacts)
-        // Authentic photos have consistent Gaussian noise. Generative AI creates "smooth" anomalous zones.
-        let totalVariance = 0;
+        // 1. ORIGINAL CANVAS
+        const canvasOriginal = document.createElement('canvas');
+        canvasOriginal.width = img.width;
+        canvasOriginal.height = img.height;
+        const ctxOriginal = canvasOriginal.getContext('2d', { willReadFrequently: true });
+        if (!ctxOriginal) return { elaScore: 50, compressionArtifacts: 50, metadataVariance: 50 };
+
+        ctxOriginal.drawImage(img, 0, 0);
+        const originalData = ctxOriginal.getImageData(0, 0, canvasOriginal.width, canvasOriginal.height).data;
+
+        // 2. ERROR LEVEL ANALYSIS (ELA) PROCESS
+        // Generate a 90% quality JPEG version to measure compression variance
+        const jpegDataUrl = canvasOriginal.toDataURL('image/jpeg', 0.90);
+
+        // Wait for compressed image to load
+        const compressedImg = document.createElement('img');
+        await new Promise((resolve) => {
+            compressedImg.onload = resolve;
+            compressedImg.src = jpegDataUrl;
+        });
+
+        // 3. COMPRESSED CANVAS
+        const canvasCompressed = document.createElement('canvas');
+        canvasCompressed.width = img.width;
+        canvasCompressed.height = img.height;
+        const ctxCompressed = canvasCompressed.getContext('2d', { willReadFrequently: true });
+        if (!ctxCompressed) return { elaScore: 50, compressionArtifacts: 50, metadataVariance: 50 };
+
+        ctxCompressed.drawImage(compressedImg, 0, 0);
+        const compressedData = ctxCompressed.getImageData(0, 0, canvasCompressed.width, canvasCompressed.height).data;
+
+        // 4. PIXEL-BY-PIXEL TENSOR VARIANCE MATH
+        let totalElaDiff = 0;
         let smoothPixels = 0;
-        
-        // Sample every 4th pixel for performance (Matrix pooling)
-        for (let i = 0; i < data.length - 16; i += 16) {
-            const r = data[i], g = data[i+1], b = data[i+2];
-            const nextR = data[i+4], nextG = data[i+5], nextB = data[i+6];
-            
-            // Calculate absolute color gradient
-            const gradient = Math.abs(r - nextR) + Math.abs(g - nextG) + Math.abs(b - nextB);
-            totalVariance += gradient;
-            
-            // If gradient is mathematically 0 in a non-black area, it's abnormally smooth (AI artifact)
-            if (gradient < 2 && (r > 10 || g > 10 || b > 10)) {
+        let totalPixels = originalData.length / 4;
+
+        // Ensure we iterate through every single pixel
+        for (let i = 0; i < originalData.length; i += 4) {
+            // Absolute difference between Original and Re-compressed JPEG
+            const diffR = Math.abs(originalData[i] - compressedData[i]);
+            const diffG = Math.abs(originalData[i + 1] - compressedData[i + 1]);
+            const diffB = Math.abs(originalData[i + 2] - compressedData[i + 2]);
+            const totalDiff = diffR + diffG + diffB;
+
+            totalElaDiff += totalDiff;
+
+            // Texture Adjacency Check (Local Pixel Smoothing vs Artifacts)
+            // AI generated images often lack micro-texture (pores, sensor grain)
+            if (totalDiff < 3 && (originalData[i] > 15 || originalData[i + 1] > 15 || originalData[i + 2] > 15)) {
                 smoothPixels++;
             }
         }
-        
-        const pixelsSampled = data.length / 16;
-        const averageVariance = totalVariance / pixelsSampled;
-        const smoothingRatio = (smoothPixels / pixelsSampled) * 100;
-        
-        // 2. Mathematical ELA Score
-        // High smoothing + weird localized gradients = AI
-        let elaScore = 85; 
-        if (smoothingRatio > 15) elaScore -= 30; // Too much "plastic" rendering
-        if (averageVariance < 10) elaScore -= 20; // Lacks natural sensor noise
-        if (smoothingRatio > 25 && averageVariance < 8) elaScore -= 40; // Double whammy (Likely Midjourney/DALL-E)
 
-        // 3. Metadata Hash Variance Check (Zero-Trust Simulation)
-        // If it's a raw unedited photo, its hash signature has specific byte entropy
-        const metadataVariance = file.name.includes("Screenshot") ? 30 : (file.size < 50000 ? 40 : 90);
-        const compressionArtifacts = smoothingRatio * 1.5;
+        // 5. SCORING ALGORITHMS
+        // Natural images have consistent high-frequency noise that amplifies during JPEG compression.
+        // Deepfakes inherently lack natural noise, resulting in an "over-smooth" ELA signature, 
+        // OR have localized extreme variance where they were "spliced/inpainted".
+
+        // Average difference per pixel
+        const avgDifference = totalElaDiff / totalPixels;
+        const smoothingRatio = (smoothPixels / totalPixels) * 100;
+
+        let elaScore = 85;
+
+        // If the entire image compresses perfectly (virtually zero diff), it's highly synthetic (Diffusion)
+        if (avgDifference < 1.0) elaScore -= 40;
+        else if (avgDifference < 2.5) elaScore -= 20;
+
+        // If the image is heavily smoothed (plastic skin/loss of texture)
+        if (smoothingRatio > 35) elaScore -= 25;
+        else if (smoothingRatio > 15) elaScore -= 10;
+
+        // 6. METADATA HASH VARIANCE (Zero-Trust Simulation)
+        let metadataVariance = file.name.includes("Screenshot") ? 30 : (file.size < 50000 ? 50 : 90);
+
+        // Map smoothing directly to physical artifact presence prediction
+        const compressionArtifacts = Math.min(100, smoothingRatio * 1.5 + (avgDifference * 2));
 
         return {
             elaScore: Math.max(0, Math.min(100, elaScore)),
@@ -171,12 +202,12 @@ export class ForensicsService {
                 // AI generators often hallucinate overlapping micro-structures near eyes/teeth.
                 if (keypoints.length >= 468) {
                     // Check topological symmetry (distance between left eye and right eye vectors)
-                    const leftEye = keypoints.find((k:any) => k.name === 'leftEye');
-                    const rightEye = keypoints.find((k:any) => k.name === 'rightEye');
-                    
+                    const leftEye = keypoints.find((k: any) => k.name === 'leftEye');
+                    const rightEye = keypoints.find((k: any) => k.name === 'rightEye');
+
                     if (leftEye && rightEye && leftEye.y && rightEye.y) {
                         const symmetryVariance = Math.abs(leftEye.y - rightEye.y);
-                        
+
                         if (symmetryVariance > 15) { // Physically impossible asymmetrical skew
                             authenticityScore -= 40;
                             keyFindings.push(`Anomalous facial topology detected: Mathematical asymmetry variance of ${symmetryVariance.toFixed(2)}px`);
