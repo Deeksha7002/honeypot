@@ -92,7 +92,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 let errorMsg = `Error [${res.status}]`;
                 try {
                     const errorData = await res.json();
-                    errorMsg = errorData.detail || errorMsg;
+                    if (typeof errorData.detail === 'string') {
+                        errorMsg = errorData.detail;
+                    } else if (errorData.detail) {
+                        errorMsg = JSON.stringify(errorData.detail);
+                    }
                 } catch {
                     const text = await res.text().catch(() => '');
                     errorMsg = `${errorMsg}: ${text.slice(0, 50) || 'Unknown Server Error'}`;
@@ -102,7 +106,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
         } catch (e: any) {
             console.error("Registration Exception:", e);
-            throw new Error(e.message || "Connection Failed - Check Network");
+            const finalMsg = e instanceof Error ? e.message : String(e);
+            throw new Error(finalMsg || "Connection Failed - Check Network");
         }
     };
 
