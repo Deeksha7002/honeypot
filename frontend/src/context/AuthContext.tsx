@@ -88,11 +88,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 await res.json();
                 // Auto login after register
                 return login(username, password);
+            } else {
+                const errorData = await res.json().catch(() => ({ detail: 'Unknown error' }));
+                console.error(`Registration failed [${res.status}]:`, errorData);
+                // Throw error to be caught by the component
+                throw new Error(errorData.detail || 'Registration failed');
             }
-        } catch (e) {
-            console.error("Registration failed", e);
+        } catch (e: any) {
+            console.error("Registration Exception:", e);
+            throw e;
         }
-        return false;
     };
 
     const logout = () => {

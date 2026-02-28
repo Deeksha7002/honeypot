@@ -258,26 +258,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
         if (password !== confirmPassword) { setError('PASSWORDS DO NOT MATCH'); return; }
         setIsLoading(true);
         try {
-            const success = await register(username, password);
-            if (!success) {
-                setError('OPERATOR ID ALREADY TAKEN - CHOOSE ANOTHER');
-            } else {
-                // Registration auto-logs in. Now try biometric enrollment.
-                localStorage.setItem('scam_registered', 'true');
-                localStorage.setItem('scam_last_user', username);
-                if (window.PublicKeyCredential) {
-                    try {
-                        setStatusMsg('SETTING UP BIOMETRICS â€” FOLLOW DEVICE PROMPT...');
-                        await enrollBiometrics(username);
-                        setStatusMsg('âœ“ BIOMETRICS ENROLLED â€” WELCOME!');
-                    } catch {
-                        setStatusMsg('âœ“ ACCOUNT CREATED â€” BIOMETRICS SKIPPED');
-                    }
+            await register(username, password);
+            // Registration auto-logs in. Now try biometric enrollment.
+            localStorage.setItem('scam_registered', 'true');
+            localStorage.setItem('scam_last_user', username);
+            if (window.PublicKeyCredential) {
+                try {
+                    setStatusMsg('SETTING UP BIOMETRICS â€” FOLLOW DEVICE PROMPT...');
+                    await enrollBiometrics(username);
+                    setStatusMsg('âœ“ BIOMETRICS ENROLLED â€” WELCOME!');
+                } catch {
+                    setStatusMsg('âœ“ ACCOUNT CREATED â€” BIOMETRICS SKIPPED');
                 }
-                // App will unmount this component since user is now logged in
             }
-        } catch {
-            setError('REGISTRATION FAILED â€” TRY AGAIN');
+            // App will unmount this component since user is now logged in
+        } catch (e: any) {
+            setError(e.message || 'REGISTRATION FAILED â€” TRY AGAIN');
         } finally {
             setIsLoading(false);
         }
