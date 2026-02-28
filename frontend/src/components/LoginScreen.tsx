@@ -312,6 +312,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
             <div className="login-card" style={{
                 width: '400px',
                 maxWidth: '95vw',
+                maxHeight: '90vh',
+                overflowY: 'auto',
                 padding: '2.5rem',
                 background: 'rgba(30, 41, 59, 0.9)',
                 border: '1px solid rgba(16, 185, 129, 0.2)',
